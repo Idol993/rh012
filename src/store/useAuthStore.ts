@@ -16,39 +16,36 @@ interface AuthState {
   login: (employeeId: string, password: string, role: Role) => Promise<void>
   logout: () => void
   checkAuth: () => void
+  fetchUserInfo: () => Promise<void>
 }
 
-const useAuthStore = create<AuthState>((set) => ({
+const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
+  isAuthenticated: false,
 
   login: async (employeeId, password, role) => {
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId, password, role }),
-      })
-      if (!res.ok) throw new Error('登录失败')
-      const data = await res.json()
-      localStorage.setItem('token', data.token)
-      set({
-        user: data.user || { id: employeeId, name: role === 'gm' ? '总经理' : employeeId, role, avatar: '' },
-        token: data.token,
-        isAuthenticated: true,
-      })
-    } catch {
-      const mockUser: User = {
-        id: employeeId,
-        name: role === 'gm' ? '总经理' : role === 'front_desk' ? '前台接待' : role === 'housekeeping_supervisor' ? '客房主管' : '服务员',
-        role,
-        avatar: '',
-      }
-      const mockToken = 'mock-token-' + Date.now()
-      localStorage.setItem('token', mockToken)
-      set({ user: mockUser, token: mockToken, isAuthenticated: true })
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId, password, role }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '登录失败')
     }
+    const { token, user } = data.data
+    localStorage.setItem('token', token)
+    set({
+      user: {
+        id: String(user.id),
+        name: user.name,
+        role: user.role,
+        avatar: user.avatar || '',
+      },
+      token,
+      isAuthenticated: true,
+    })
   },
 
   logout: () => {
@@ -58,7 +55,31 @@ const useAuthStore = create<AuthState>((set) => ({
 
   checkAuth: () => {
     const token = localStorage.getItem('token')
-    set({ token, isAuthenticated: !!token })
+    if (token) {
+      get().fetchUserInfo().catch(() => {
+        localStorage.removeItem('token')
+        set({ user: null, token: null, isAuthenticated: false })
+      })
+    }
+  },
+
+  fetchUserInfo: async () => {
+    const token = localStorage.getItem('token')
+    if (!token) throw new Error('未登录')
+    const res = await fetch('/api/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+    if (!res.ok) throw new Error('验证失败')
+    const data = await res.json()
+    set({
+      user: {
+        id: String(data.data.id),
+        name: data.data.name,
+        role: data.data.role,
+        avatar: data.data.avatar || '',
+      },
+      isAuthenticated: true,
+    })
   },
 }))
 

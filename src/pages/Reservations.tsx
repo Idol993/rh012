@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Plus, Wand2, Eye } from 'lucide-react'
 import useReservationStore from '@/store/useReservationStore'
+import type { AutoAssignResult } from '@/store/useReservationStore'
 import StatusBadge from '@/components/StatusBadge'
 
 export default function Reservations() {
@@ -9,7 +10,7 @@ export default function Reservations() {
   const { reservations, fetchReservations, autoAssign } = useReservationStore()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [assignModal, setAssignModal] = useState<{ id: string; results: { roomId: string; matchScore: number }[]; prefs: string[] } | null>(null)
+  const [assignModal, setAssignModal] = useState<{ id: number; result: AutoAssignResult | null; prefs: string[] } | null>(null)
 
   useEffect(() => {
     fetchReservations()
@@ -17,14 +18,14 @@ export default function Reservations() {
 
   const filtered = reservations.filter((r) => {
     if (statusFilter !== 'all' && r.status !== statusFilter) return false
-    if (search && !r.guestName.includes(search) && !r.id.includes(search)) return false
+    if (search && !r.guestName.includes(search) && !String(r.id).includes(search)) return false
     return true
   })
 
-  const handleAutoAssign = async (id: string) => {
-    const res = await useReservationStore.getState().autoAssign(id)
+  const handleAutoAssign = async (id: number) => {
+    const res = await autoAssign(id)
     const resItem = reservations.find((r) => r.id === id)
-    setAssignModal({ id, results: res, prefs: resItem?.preferences || [] })
+    setAssignModal({ id, result: res, prefs: resItem?.preferences || [] })
   }
 
   return (
@@ -123,20 +124,30 @@ export default function Reservations() {
             </div>
             <div className="space-y-3">
               <p className="text-xs text-[#F5F0EB]/50">推荐房间</p>
-              {assignModal.results.map((r, i) => (
-                <div key={i} className="p-3 bg-[#0D1B2A]/50 rounded-lg border border-[#C9A96E]/10">
+              {assignModal.result && (
+                <div className="p-3 bg-[#0D1B2A]/50 rounded-lg border border-[#C9A96E]/10">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-[#F5F0EB]">{r.roomId.replace('room-', '')}号房</span>
-                    <span className="text-sm font-bold text-[#C9A96E]">{r.matchScore}%匹配</span>
+                    <span className="text-sm font-medium text-[#F5F0EB]">{assignModal.result.roomNumber}号房</span>
+                    <span className="text-sm font-bold text-[#C9A96E]">{assignModal.result.matchScore}%匹配</span>
                   </div>
                   <div className="w-full h-2 bg-[#F5F0EB]/10 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${r.matchScore}%`, backgroundColor: r.matchScore >= 80 ? '#34D399' : r.matchScore >= 60 ? '#F59E0B' : '#EF4444' }}
+                      style={{ width: `${assignModal.result.matchScore}%`, backgroundColor: assignModal.result.matchScore >= 80 ? '#34D399' : assignModal.result.matchScore >= 60 ? '#F59E0B' : '#EF4444' }}
                     />
                   </div>
+                  {assignModal.result.matchDetails && assignModal.result.matchDetails.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {assignModal.result.matchDetails.map((d, i) => (
+                        <div key={i} className="text-xs flex items-center gap-2">
+                          <span className={d.matched ? 'text-[#34D399]' : 'text-[#EF4444]'}>{d.matched ? '✓' : '✗'}</span>
+                          <span className="text-[#F5F0EB]/60">{d.preference}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
             </div>
             <button
               onClick={() => setAssignModal(null)}

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Search, X, Crown } from 'lucide-react'
-import ReactECharts from 'echarts-for-react'
-import useMemberStore, { tierThresholds } from '@/store/useMemberStore'
+import useMemberStore from '@/store/useMemberStore'
 import type { MemberTier } from '@/store/useMemberStore'
 
 const tierColors: Record<MemberTier, string> = {
@@ -32,14 +31,6 @@ export default function Members() {
   const getNextTier = (tier: MemberTier): MemberTier | null => {
     const idx = tierOrder.indexOf(tier)
     return idx < tierOrder.length - 1 ? tierOrder[idx + 1] : null
-  }
-
-  const getUpgradeProgress = (tier: MemberTier, points: number) => {
-    const next = getNextTier(tier)
-    if (!next) return 100
-    const currentThreshold = tierThresholds[tier]
-    const nextThreshold = tierThresholds[next]
-    return Math.min(100, Math.round(((points - currentThreshold) / (nextThreshold - currentThreshold)) * 100))
   }
 
   return (
@@ -93,7 +84,7 @@ export default function Members() {
           <div className="gradient-border p-6 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-[#C9A96E] font-['Playfair_Display']">会员详情</h3>
-              <button onClick={() => selectMember(selectedMember.id)} className="p-1 text-[#F5F0EB]/40 hover:text-[#F5F0EB]"><X className="w-4 h-4" /></button>
+              <button onClick={() => selectMember(null)} className="p-1 text-[#F5F0EB]/40 hover:text-[#F5F0EB]"><X className="w-4 h-4" /></button>
             </div>
 
             <div className="text-center py-4">
@@ -119,29 +110,17 @@ export default function Members() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-[#F5F0EB]/50">升级进度</span>
                 <span className="text-xs text-[#C9A96E]">
-                  {selectedMember.points.toLocaleString()} / {(tierThresholds[getNextTier(selectedMember.tier) || 'diamond'] || tierThresholds.diamond).toLocaleString()} 积分
+                  {selectedMember.points.toLocaleString()} / {selectedMember.nextTierThreshold ? selectedMember.nextTierThreshold.toLocaleString() : '—'} 积分
                 </span>
               </div>
               <div className="w-full h-2 bg-[#F5F0EB]/10 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${getUpgradeProgress(selectedMember.tier, selectedMember.points)}%`, backgroundColor: tierColors[selectedMember.tier] }} />
+                <div className="h-full rounded-full transition-all duration-500" style={{ width: `${selectedMember.progressToNextTier}%`, backgroundColor: tierColors[selectedMember.tier] }} />
               </div>
               <p className="text-xs text-[#F5F0EB]/30 mt-1">
-                {getNextTier(selectedMember.tier) ? `距离${tierLabels[getNextTier(selectedMember.tier)!]}还需${(tierThresholds[getNextTier(selectedMember.tier)!] - selectedMember.points).toLocaleString()}积分` : '已达到最高等级'}
+                {getNextTier(selectedMember.tier) && selectedMember.nextTierThreshold
+                  ? `距离${tierLabels[getNextTier(selectedMember.tier)!]}还需${(selectedMember.nextTierThreshold - selectedMember.points).toLocaleString()}积分`
+                  : '已达到最高等级'}
               </p>
-            </div>
-
-            <div>
-              <p className="text-xs text-[#F5F0EB]/50 mb-2">消费趋势</p>
-              <ReactECharts
-                option={{
-                  grid: { top: 10, right: 10, bottom: 20, left: 40 },
-                  xAxis: { type: 'category', data: selectedMember.spendingTrend.map((s) => s.month), axisLine: { lineStyle: { color: '#C9A96E20' } }, axisLabel: { color: '#F5F0EB60', fontSize: 10 } },
-                  yAxis: { type: 'value', splitLine: { lineStyle: { color: '#C9A96E10' } }, axisLabel: { color: '#F5F0EB40', fontSize: 10 } },
-                  series: [{ type: 'line', data: selectedMember.spendingTrend.map((s) => s.amount), smooth: true, lineStyle: { color: '#C9A96E', width: 2 }, areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#C9A96E40' }, { offset: 1, color: '#C9A96E05' }] } }, itemStyle: { color: '#C9A96E' }, symbol: 'circle', symbolSize: 4 }],
-                  tooltip: { trigger: 'axis', backgroundColor: '#1B2A4A', borderColor: '#C9A96E40', textStyle: { color: '#F5F0EB', fontSize: 12 } },
-                }}
-                style={{ height: '160px' }}
-              />
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-center">

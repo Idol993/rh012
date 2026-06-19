@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User, CheckCircle, Key, ScanLine } from 'lucide-react'
 import useReservationStore from '@/store/useReservationStore'
 import StatusBadge from '@/components/StatusBadge'
@@ -6,17 +6,35 @@ import StatusBadge from '@/components/StatusBadge'
 const steps = ['选择预订', '人脸验证', '发放钥匙', '完成入住']
 
 export default function CheckIn() {
-  const { reservations } = useReservationStore()
+  const { reservations, fetchReservations, checkIn } = useReservationStore()
   const [currentStep, setCurrentStep] = useState(0)
-  const [selectedRes, setSelectedRes] = useState<string | null>(null)
+  const [selectedRes, setSelectedRes] = useState<number | null>(null)
   const [scanning, setScanning] = useState(false)
   const [verified, setVerified] = useState(false)
   const [keyType, setKeyType] = useState<'card' | 'bluetooth'>('card')
   const [complete, setComplete] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [checkInResult, setCheckInResult] = useState<{ roomNumber: string; keyInfo: { type: string; code: string } } | null>(null)
+
+  useEffect(() => {
+    const loadReservations = async () => {
+      setLoading(true)
+      setError('')
+      try {
+        await fetchReservations()
+      } catch (err: any) {
+        setError(err.message || '获取预订列表失败')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadReservations()
+  }, [fetchReservations])
 
   const confirmedRes = reservations.filter((r) => r.status === 'confirmed')
 
-  const handleSelectRes = (id: string) => {
+  const handleSelectRes = (id: number) => {
     setSelectedRes(id)
     setCurrentStep(1)
   }
@@ -30,15 +48,29 @@ export default function CheckIn() {
     }, 2500)
   }
 
-  const handleKeyIssue = () => {
-    setCurrentStep(3)
-    setTimeout(() => setComplete(true), 500)
+  const handleKeyIssue = async () => {
+    if (selectedRes === null) return
+    setError('')
+    try {
+      const result = await checkIn(selectedRes, verified, keyType)
+      setCheckInResult({ roomNumber: result.roomNumber, keyInfo: result.keyInfo })
+      setCurrentStep(3)
+      setTimeout(() => setComplete(true), 500)
+    } catch (err: any) {
+      setError(err.message || '入住失败')
+    }
   }
 
   const res = reservations.find((r) => r.id === selectedRes)
 
   return (
     <div className="max-w-3xl mx-auto animate-fade-in">
+      {error && (
+        <div className="p-4 mb-4 bg-[#EF4444]/10 border border-[#EF4444]/30 rounded-lg text-[#EF4444] text-sm">
+          {error}
+        </div>
+      )}
+
       <div className="gradient-border p-6 mb-6">
         <h2 className="text-2xl font-bold text-[#C9A96E] font-['Playfair_Display'] mb-6 text-center">自助入住终端</h2>
         <div className="flex items-center justify-between mb-8">
@@ -66,7 +98,9 @@ export default function CheckIn() {
         <div className="gradient-border p-6">
           <h3 className="text-lg font-bold text-[#C9A96E] mb-4 font-['Playfair_Display']">今日待入住预订</h3>
           <div className="space-y-3">
-            {confirmedRes.length === 0 ? (
+            {loading ? (
+              <p className="text-center text-[#F5F0EB]/40 py-8">加载中...</p>
+            ) : confirmedRes.length === 0 ? (
               <p className="text-center text-[#F5F0EB]/40 py-8">暂无待入住预订</p>
             ) : (
               confirmedRes.map((r) => (
@@ -148,7 +182,7 @@ export default function CheckIn() {
           <div className="gradient-border p-4 mb-6">
             <p className="text-xs text-[#F5F0EB]/50 mb-1">钥匙码</p>
             <p className="text-2xl font-bold text-[#C9A96E] font-mono tracking-widest">
-              {res?.id?.replace('RES-', '') || '2048'}-{Math.random().toString(36).substring(2, 8).toUpperCase()}
+              {checkInResult?.keyInfo?.code || '------'}
             </p>
           </div>
           <button onClick={handleKeyIssue} className="px-8 py-3 bg-gradient-to-r from-[#C9A96E] to-[#E8D5B0] text-[#0D1B2A] font-bold rounded-lg">
@@ -167,7 +201,7 @@ export default function CheckIn() {
           <div className="gradient-border p-4 inline-block">
             <p className="text-xs text-[#F5F0EB]/50">您的房间</p>
             <p className="text-4xl font-bold text-[#C9A96E] font-['Playfair_Display']">
-              {res?.roomType || '豪华间'} · {Math.floor(Math.random() * 8 + 1)}0{Math.floor(Math.random() * 5 + 1)}
+              {checkInResult?.roomNumber || '---'}号房
             </p>
           </div>
         </div>

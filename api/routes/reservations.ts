@@ -209,6 +209,55 @@ router.post('/:id/auto-assign', async (req: Request, res: Response): Promise<voi
   }
 })
 
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const reservationId = Number(req.params.id)
+    const reservation = queryOne(
+      `SELECT r.id, r.guest_id, r.member_id, r.room_id, r.status, r.check_in, r.check_out,
+              r.room_type, r.preferences, r.total_amount, r.key_type, r.created_at,
+              g.name as guest_name, g.phone as guest_phone,
+              m.name as member_name, m.tier as member_tier,
+              rm.room_number
+       FROM reservations r
+       LEFT JOIN guests g ON r.guest_id = g.id
+       LEFT JOIN members m ON r.member_id = m.id
+       LEFT JOIN rooms rm ON r.room_id = rm.id
+       WHERE r.id = ?`,
+      [reservationId]
+    )
+
+    if (!reservation) {
+      res.status(404).json({ success: false, error: '预订不存在' })
+      return
+    }
+
+    const r: any = reservation
+    const data = {
+      id: r.id,
+      guestId: r.guest_id,
+      guestName: r.guest_name,
+      phone: r.guest_phone,
+      memberId: r.member_id,
+      memberName: r.member_name,
+      memberTier: r.member_tier,
+      roomId: r.room_id,
+      roomNumber: r.room_number,
+      checkIn: r.check_in,
+      checkOut: r.check_out,
+      roomType: r.room_type,
+      status: r.status,
+      preferences: JSON.parse(r.preferences || '[]'),
+      totalAmount: r.total_amount,
+      keyType: r.key_type,
+      createdAt: r.created_at,
+    }
+
+    res.json({ success: true, data })
+  } catch (error) {
+    res.status(500).json({ success: false, error: '获取预订详情失败' })
+  }
+})
+
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const reservationId = Number(req.params.id)
@@ -227,7 +276,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     if (checkOut) { parts.push('check_out = ?'); params.push(checkOut) }
     if (status) { parts.push('status = ?'); params.push(status) }
     if (preferences) { parts.push('preferences = ?'); params.push(JSON.stringify(preferences)) }
-    if (roomId) { parts.push('room_id = ?'); params.push(roomId) }
+    if (roomId !== undefined && roomId !== null) { parts.push('room_id = ?'); params.push(roomId) }
 
     if (parts.length === 0) {
       res.status(400).json({ success: false, error: '没有需要更新的字段' })
@@ -238,7 +287,42 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     params.push(reservationId)
     run(`UPDATE reservations SET ${parts.join(', ')} WHERE id = ?`, params)
 
-    res.json({ success: true, data: { id: reservationId } })
+    const updated = queryOne(
+      `SELECT r.id, r.guest_id, r.member_id, r.room_id, r.status, r.check_in, r.check_out,
+              r.room_type, r.preferences, r.total_amount, r.key_type, r.created_at,
+              g.name as guest_name, g.phone as guest_phone,
+              m.name as member_name, m.tier as member_tier,
+              rm.room_number
+       FROM reservations r
+       LEFT JOIN guests g ON r.guest_id = g.id
+       LEFT JOIN members m ON r.member_id = m.id
+       LEFT JOIN rooms rm ON r.room_id = rm.id
+       WHERE r.id = ?`,
+      [reservationId]
+    )
+
+    const r: any = updated
+    const data = {
+      id: r.id,
+      guestId: r.guest_id,
+      guestName: r.guest_name,
+      phone: r.guest_phone,
+      memberId: r.member_id,
+      memberName: r.member_name,
+      memberTier: r.member_tier,
+      roomId: r.room_id,
+      roomNumber: r.room_number,
+      checkIn: r.check_in,
+      checkOut: r.check_out,
+      roomType: r.room_type,
+      status: r.status,
+      preferences: JSON.parse(r.preferences || '[]'),
+      totalAmount: r.total_amount,
+      keyType: r.key_type,
+      createdAt: r.created_at,
+    }
+
+    res.json({ success: true, data })
   } catch (error) {
     res.status(500).json({ success: false, error: '更新预订失败' })
   }

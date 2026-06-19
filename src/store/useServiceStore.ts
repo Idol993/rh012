@@ -1,60 +1,47 @@
 import { create } from 'zustand'
 
 export type ServiceStatus = 'pending' | 'assigned' | 'in_progress' | 'completed'
-export type ServiceType = 'room_service' | 'laundry' | 'maintenance' | 'minibar' | 'wake_up' | 'luggage' | 'other'
+export type ServiceType = 'water' | 'towel' | 'cleaning' | 'maintenance' | 'other'
 export type Priority = 'low' | 'medium' | 'high' | 'urgent'
 
+export interface AssignedStaff {
+  id: number
+  name: string
+  distance: string
+}
+
 export interface ServiceRequest {
-  id: string
-  roomId: string
+  id: number
+  roomId: number
   roomNumber: string
   type: ServiceType
   description: string
-  status: ServiceStatus
   priority: Priority
-  assignedTo?: string
+  status: ServiceStatus
+  assignedTo?: AssignedStaff
   createdAt: string
   completedAt?: string
+}
+
+export interface AutoDispatchResult {
+  requestId: number
+  assignedStaff: AssignedStaff
+}
+
+interface CreateServiceRequest {
+  roomId: number
+  type: ServiceType
+  description: string
+  priority: Priority
 }
 
 interface ServiceState {
   serviceRequests: ServiceRequest[]
   loading: boolean
   fetchRequests: () => Promise<void>
-  createRequest: (data: Partial<ServiceRequest>) => Promise<void>
-  updateRequestStatus: (id: string, status: ServiceStatus) => Promise<void>
-  autoDispatch: (id: string) => Promise<{ staffName: string; distance: string }[]>
-}
-
-const generateRequests = (): ServiceRequest[] => {
-  const types: ServiceType[] = ['room_service', 'laundry', 'maintenance', 'minibar', 'wake_up', 'luggage']
-  const descs: Record<ServiceType, string> = {
-    room_service: '送餐至房间',
-    laundry: '收取洗衣',
-    maintenance: '维修浴室水龙头',
-    minibar: '补充迷你吧',
-    wake_up: '明日6:00叫醒',
-    luggage: '协助搬运行李',
-    other: '其他服务',
-  }
-  const statuses: ServiceStatus[] = ['pending', 'pending', 'assigned', 'in_progress', 'completed']
-  const priorities: Priority[] = ['low', 'medium', 'medium', 'high', 'urgent']
-  const staff = ['小李', '小王', '小张', '小陈']
-  return Array.from({ length: 12 }, (_, i) => {
-    const type = types[i % types.length]
-    const status = statuses[i % statuses.length]
-    return {
-      id: `SRV-${String(100 + i)}`,
-      roomId: `room-${Math.ceil((i + 1) / 5)}${String((i % 5) + 1).padStart(2, '0')}`,
-      roomNumber: `${Math.ceil((i + 1) / 5)}${String((i % 5) + 1).padStart(2, '0')}`,
-      type,
-      description: descs[type],
-      status,
-      priority: priorities[i % priorities.length],
-      assignedTo: status !== 'pending' ? staff[i % staff.length] : undefined,
-      createdAt: `2026-06-19T${String(8 + i).padStart(2, '0')}:${String(i * 5 % 60).padStart(2, '0')}:00`,
-    }
-  })
+  createRequest: (data: CreateServiceRequest) => Promise<ServiceRequest>
+  updateRequestStatus: (id: number, status: ServiceStatus) => Promise<void>
+  autoDispatch: (id: number) => Promise<AutoDispatchResult>
 }
 
 const useServiceStore = create<ServiceState>((set) => ({
@@ -63,66 +50,68 @@ const useServiceStore = create<ServiceState>((set) => ({
 
   fetchRequests: async () => {
     set({ loading: true })
-    try {
-      const res = await fetch('/api/service-requests')
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      set({ serviceRequests: data, loading: false })
-    } catch {
-      set({ serviceRequests: generateRequests(), loading: false })
+    const res = await fetch('/api/service-requests')
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      set({ loading: false })
+      throw new Error(data.error || '获取服务请求失败')
     }
+    set({ serviceRequests: data.data, loading: false })
   },
 
   createRequest: async (data) => {
-    const newReq: ServiceRequest = {
-      id: `SRV-${String(200 + Math.floor(Math.random() * 1000))}`,
-      roomId: data.roomId || '',
-      roomNumber: data.roomNumber || '',
-      type: data.type || 'other',
-      description: data.description || '',
-      status: 'pending',
-      priority: data.priority || 'medium',
-      createdAt: new Date().toISOString(),
+    const res = await fetch('/api/service-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const result = await res.json()
+    if (!res.ok || !result.success) {
+      throw new Error(result.error || '创建服务请求失败')
     }
-    try {
-      const res = await fetch('/api/service-requests', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newReq),
-      })
-      if (res.ok) {
-        const saved = await res.json()
-        set((state) => ({ serviceRequests: [saved, ...state.serviceRequests] }))
-        return
-      }
-    } catch {}
+    const newReq = result.data
     set((state) => ({ serviceRequests: [newReq, ...state.serviceRequests] }))
+    return newReq
   },
 
   updateRequestStatus: async (id, status) => {
-    try {
-      await fetch(`/api/service-requests/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-    } catch {}
+    const res = await fetch(`/api/service-requests/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '更新服务请求失败')
+    }
     set((state) => ({
       serviceRequests: state.serviceRequests.map((r) =>
-        r.id === id ? { ...r, status, completedAt: status === 'completed' ? new Date().toISOString() : r.completedAt } : r
+        r.id === id
+          ? { ...r, status, completedAt: status === 'completed' ? new Date().toISOString() : r.completedAt }
+          : r
       ),
     }))
   },
 
   autoDispatch: async (id) => {
-    try {
-      const res = await fetch(`/api/service-requests/${id}/auto-dispatch`)
-      if (res.ok) return await res.json()
-    } catch {}
-    return [
-      { staffName: '小李', distance: '3楼' },
-      { staffName: '小张', distance: '5楼' },
-    ]
+    const res = await fetch('/api/service-requests/auto-dispatch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requestId: id }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '自动派单失败')
+    }
+    const result = data.data
+    if (result.assignedStaff) {
+      set((state) => ({
+        serviceRequests: state.serviceRequests.map((r) =>
+          r.id === id ? { ...r, status: 'assigned', assignedTo: result.assignedStaff } : r
+        ),
+      }))
+    }
+    return result
   },
 }))
 

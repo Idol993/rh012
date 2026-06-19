@@ -1,108 +1,41 @@
 import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { TrendingUp, TrendingDown, Zap, Star, Download, RefreshCw } from 'lucide-react'
-
-interface GMDashboardData {
-  occupancy: { current: number; yesterday: number; trend: number[] }
-  revpar: { current: number; yesterday: number; adr: number; trend: number[] }
-  reviews: {
-    average: number
-    platforms: { name: string; score: number; count: number }[]
-    trend: number[]
-    keywords: { word: string; weight: number }[]
-  }
-  energy: {
-    total: number
-    byFloor: { floor: number; consumption: number }[]
-    alerts: { message: string; level: string }[]
-  }
-  revenue: {
-    roomRevenue: number
-    minibarRevenue: number
-    serviceRevenue: number
-    total: number
-  }
-}
+import useDashboardStore from '@/store/useDashboardStore'
 
 export default function GMDashboard() {
-  const [data, setData] = useState<GMDashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { dashboardData, loading, fetchDashboardData, exportReport } = useDashboardStore()
   const [lastRefresh, setLastRefresh] = useState(new Date())
 
-  const fetchData = async () => {
-    setLoading(true)
+  const handleRefresh = async () => {
     try {
-      const res = await fetch('/api/gm/dashboard')
-      if (res.ok) {
-        const json = await res.json()
-        setData(json.data)
-      } else {
-        throw new Error()
-      }
-    } catch {
-      setData({
-        occupancy: { current: 78, yesterday: 72, trend: [68, 72, 75, 70, 78, 82, 78] },
-        revpar: { current: 640, yesterday: 580, adr: 820, trend: [520, 580, 610, 590, 640, 680, 640] },
-        reviews: {
-          average: 4.6,
-          platforms: [
-            { name: '携程', score: 4.7, count: 1286 },
-            { name: '美团', score: 4.5, count: 892 },
-            { name: '飞猪', score: 4.8, count: 564 },
-          ],
-          trend: [4.4, 4.5, 4.5, 4.6, 4.6, 4.7, 4.6],
-          keywords: [
-            { word: '服务好', weight: 95 },
-            { word: '位置便利', weight: 88 },
-            { word: '房间干净', weight: 82 },
-            { word: '早餐丰富', weight: 75 },
-            { word: '设施老旧', weight: 30 },
-          ],
-        },
-        energy: {
-          total: 2860,
-          byFloor: [
-            { floor: 1, consumption: 280 },
-            { floor: 2, consumption: 310 },
-            { floor: 3, consumption: 350 },
-            { floor: 4, consumption: 290 },
-            { floor: 5, consumption: 360 },
-            { floor: 6, consumption: 380 },
-            { floor: 7, consumption: 420 },
-            { floor: 8, consumption: 470 },
-          ],
-          alerts: [
-            { message: '8楼能耗较昨日上升15%', level: 'warning' },
-            { message: '3楼空调系统运行正常', level: 'info' },
-          ],
-        },
-        revenue: { roomRevenue: 18380, minibarRevenue: 244, serviceRevenue: 0, total: 18624 },
-      })
+      await fetchDashboardData()
+      setLastRefresh(new Date())
+    } catch (err: any) {
+      alert(err.message || '刷新失败')
     }
-    setLoading(false)
-    setLastRefresh(new Date())
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchDashboardData()
+  }, [fetchDashboardData])
 
   useEffect(() => {
-    const timer = setInterval(fetchData, 60000)
+    const timer = setInterval(handleRefresh, 60000)
     return () => clearInterval(timer)
   }, [])
 
   const handleExport = async () => {
     try {
-      await fetch('/api/gm/export-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'night_audit', format: 'pdf' }),
-      })
-    } catch {}
-    alert('夜审报表已生成，正在下载...')
+      await exportReport('night_audit', 'pdf')
+    } catch (err: any) {
+      alert(err.message || '导出失败')
+    }
   }
 
-  if (!data) return null
+  if (!dashboardData) return null
 
+  const data = dashboardData
   const occChange = data.occupancy.current - data.occupancy.yesterday
   const revparChange = data.revpar.current - data.revpar.yesterday
   const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -185,7 +118,7 @@ export default function GMDashboard() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={fetchData}
+            onClick={handleRefresh}
             className="flex items-center gap-2 px-4 py-2 bg-[#1B2A4A] border border-[#C9A96E]/30 text-[#C9A96E] rounded-lg hover:bg-[#C9A96E]/10 transition-all"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />

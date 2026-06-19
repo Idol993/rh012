@@ -15,16 +15,16 @@ export default function Dashboard() {
 
   const kpiSets = {
     staff: [
-      { title: '待处理请求', value: dashboardData?.pendingServices || 6, icon: <Bell className="w-5 h-5" />, color: '#EF4444' },
+      { title: '待处理请求', value: 6, icon: <Bell className="w-5 h-5" />, color: '#EF4444' },
       { title: '今日任务', value: 8, icon: <Sparkles className="w-5 h-5" />, color: '#3B82F6' },
       { title: '已完成', value: 12, icon: <TrendingUp className="w-5 h-5" />, color: '#34D399' },
       { title: '服务评分', value: 96, icon: <Users className="w-5 h-5" />, color: '#C9A96E', suffix: '分' },
     ],
     front_desk: [
-      { title: '今日入住', value: dashboardData?.todayCheckIns || 12, icon: <LogIn className="w-5 h-5" />, color: '#34D399', change: 15 },
-      { title: '今日退房', value: dashboardData?.todayCheckOuts || 8, icon: <LogOut className="w-5 h-5" />, color: '#3B82F6' },
-      { title: '可用客房', value: dashboardData?.availableRooms || 17, icon: <BedDouble className="w-5 h-5" />, color: '#C9A96E' },
-      { title: '今日收入', value: dashboardData?.revenue || 128500, icon: <DollarSign className="w-5 h-5" />, color: '#F59E0B', prefix: '¥' },
+      { title: '今日入住', value: 12, icon: <LogIn className="w-5 h-5" />, color: '#34D399', change: 15 },
+      { title: '今日退房', value: 8, icon: <LogOut className="w-5 h-5" />, color: '#3B82F6' },
+      { title: '可用客房', value: 17, icon: <BedDouble className="w-5 h-5" />, color: '#C9A96E' },
+      { title: '今日收入', value: dashboardData?.revenue.total || 128500, icon: <DollarSign className="w-5 h-5" />, color: '#F59E0B', prefix: '¥' },
     ],
     housekeeping_supervisor: [
       { title: '待清洁', value: 8, icon: <Sparkles className="w-5 h-5" />, color: '#F59E0B' },
@@ -33,10 +33,10 @@ export default function Dashboard() {
       { title: '质量评分', value: 94, icon: <Users className="w-5 h-5" />, color: '#C9A96E', suffix: '分' },
     ],
     gm: [
-      { title: '入住率', value: dashboardData?.occupancyRate || 78, icon: <BedDouble className="w-5 h-5" />, color: '#C9A96E', suffix: '%', change: 5 },
-      { title: '今日收入', value: dashboardData?.revenue || 128500, icon: <DollarSign className="w-5 h-5" />, color: '#34D399', prefix: '¥', change: 12 },
-      { title: '平均房价', value: dashboardData?.avgRoomRate || 680, icon: <TrendingUp className="w-5 h-5" />, color: '#3B82F6', prefix: '¥' },
-      { title: '待处理服务', value: dashboardData?.pendingServices || 6, icon: <Bell className="w-5 h-5" />, color: '#EF4444' },
+      { title: '入住率', value: dashboardData?.occupancy.current || 78, icon: <BedDouble className="w-5 h-5" />, color: '#C9A96E', suffix: '%', change: 5 },
+      { title: '今日收入', value: dashboardData?.revenue.total || 128500, icon: <DollarSign className="w-5 h-5" />, color: '#34D399', prefix: '¥', change: 12 },
+      { title: '平均房价', value: dashboardData?.revpar.adr || 680, icon: <TrendingUp className="w-5 h-5" />, color: '#3B82F6', prefix: '¥' },
+      { title: '总能耗', value: dashboardData?.energy.total || 2860, icon: <Bell className="w-5 h-5" />, color: '#6366F1', suffix: ' kWh' },
     ],
   }
 

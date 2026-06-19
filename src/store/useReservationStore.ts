@@ -1,19 +1,53 @@
 import { create } from 'zustand'
+import type { RoomType } from './useRoomStore'
 
 export type ReservationStatus = 'pending' | 'confirmed' | 'checked_in' | 'checked_out' | 'cancelled'
 
 export interface Reservation {
-  id: string
+  id: number
   guestName: string
-  guestPhone: string
-  roomType: string
+  memberId?: number
+  phone: string
   checkIn: string
   checkOut: string
+  roomType: RoomType
   status: ReservationStatus
-  roomId?: string
-  memberTier?: string
   preferences: string[]
+  assignedRoomId?: number
+  totalAmount?: number
   createdAt: string
+}
+
+export interface AutoAssignResult {
+  roomId: number
+  roomNumber: string
+  matchScore: number
+  matchDetails: { preference: string; matched: boolean }[]
+}
+
+export interface CheckInResult {
+  success: boolean
+  roomNumber: string
+  keyInfo: { type: string; code: string }
+}
+
+export interface CheckOutResult {
+  success: boolean
+  totalBill: number
+  invoiceUrl: string
+  pointsEarned: number
+  memberUpgraded: boolean
+  newTier?: string
+}
+
+interface CreateReservationRequest {
+  guestName: string
+  phone: string
+  checkIn: string
+  checkOut: string
+  roomType: RoomType
+  preferences?: string[]
+  memberId?: number
 }
 
 interface ReservationState {
@@ -21,29 +55,11 @@ interface ReservationState {
   currentReservation: Reservation | null
   loading: boolean
   fetchReservations: () => Promise<void>
-  createReservation: (data: Partial<Reservation>) => Promise<Reservation>
-  autoAssign: (id: string) => Promise<{ roomId: string; matchScore: number }[]>
-  updateReservation: (id: string, data: Partial<Reservation>) => Promise<void>
-}
-
-const generateReservations = (): Reservation[] => {
-  const names = ['张伟', '李娜', '王芳', '刘洋', '陈明', '赵雪', '孙鹏', '周丽', '吴强', '郑慧', '黄磊', '林涛']
-  const types = ['标准间', '豪华间', '套房', '总统套房']
-  const statuses: ReservationStatus[] = ['pending', 'confirmed', 'confirmed', 'checked_in', 'checked_out']
-  const prefs = ['高楼层', '无烟', '硬枕', '低楼层', '吸烟', '软枕']
-  return names.map((name, i) => ({
-    id: `RES-${String(1000 + i)}`,
-    guestName: name,
-    guestPhone: `138${String(10000000 + i * 123456).slice(0, 8)}`,
-    roomType: types[i % types.length],
-    checkIn: '2026-06-19',
-    checkOut: '2026-06-22',
-    status: statuses[i % statuses.length],
-    roomId: statuses[i % statuses.length] === 'checked_in' ? `room-${3}${String(i % 5 + 1).padStart(2, '0')}` : undefined,
-    memberTier: i % 3 === 0 ? 'gold' : i % 5 === 0 ? 'platinum' : undefined,
-    preferences: [prefs[i % prefs.length], prefs[(i + 2) % prefs.length]],
-    createdAt: '2026-06-15',
-  }))
+  createReservation: (data: CreateReservationRequest) => Promise<Reservation>
+  updateReservation: (id: number, data: Partial<Reservation>) => Promise<Reservation>
+  autoAssign: (id: number) => Promise<AutoAssignResult>
+  checkIn: (reservationId: number, faceVerified: boolean, keyType: 'card' | 'bluetooth') => Promise<CheckInResult>
+  checkOut: (reservationId: number) => Promise<CheckOutResult>
 }
 
 const useReservationStore = create<ReservationState>((set) => ({
@@ -53,67 +69,92 @@ const useReservationStore = create<ReservationState>((set) => ({
 
   fetchReservations: async () => {
     set({ loading: true })
-    try {
-      const res = await fetch('/api/reservations')
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      set({ reservations: data, loading: false })
-    } catch {
-      set({ reservations: generateReservations(), loading: false })
+    const res = await fetch('/api/reservations')
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      set({ loading: false })
+      throw new Error(data.error || '获取预订列表失败')
     }
+    set({ reservations: data.data, loading: false })
   },
 
   createReservation: async (data) => {
-    const newRes: Reservation = {
-      id: `RES-${String(2000 + Math.floor(Math.random() * 1000))}`,
-      guestName: data.guestName || '',
-      guestPhone: data.guestPhone || '',
-      roomType: data.roomType || '标准间',
-      checkIn: data.checkIn || '2026-06-19',
-      checkOut: data.checkOut || '2026-06-22',
-      status: 'confirmed',
-      preferences: data.preferences || [],
-      createdAt: new Date().toISOString().split('T')[0],
+    const res = await fetch('/api/reservations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const result = await res.json()
+    if (!res.ok || !result.success) {
+      throw new Error(result.error || '创建预订失败')
     }
-    try {
-      const res = await fetch('/api/reservations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newRes),
-      })
-      if (res.ok) {
-        const saved = await res.json()
-        set((state) => ({ reservations: [...state.reservations, saved] }))
-        return saved
-      }
-    } catch {}
-    set((state) => ({ reservations: [...state.reservations, newRes] }))
-    return newRes
-  },
-
-  autoAssign: async (id) => {
-    try {
-      const res = await fetch(`/api/reservations/${id}/auto-assign`)
-      if (res.ok) return await res.json()
-    } catch {}
-    return [
-      { roomId: 'room-301', matchScore: 95 },
-      { roomId: 'room-501', matchScore: 82 },
-      { roomId: 'room-702', matchScore: 68 },
-    ]
+    const newReservation = result.data
+    set((state) => ({ reservations: [...state.reservations, newReservation] }))
+    return newReservation
   },
 
   updateReservation: async (id, data) => {
-    try {
-      await fetch(`/api/reservations/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-    } catch {}
+    const res = await fetch(`/api/reservations/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const result = await res.json()
+    if (!res.ok || !result.success) {
+      throw new Error(result.error || '更新预订失败')
+    }
+    const updated = result.data
     set((state) => ({
-      reservations: state.reservations.map((r) => (r.id === id ? { ...r, ...data } : r)),
+      reservations: state.reservations.map((r) => (r.id === id ? updated : r)),
     }))
+    return updated
+  },
+
+  autoAssign: async (id) => {
+    const res = await fetch(`/api/reservations/${id}/auto-assign`, {
+      method: 'POST',
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '智能分配失败')
+    }
+    return data.data
+  },
+
+  checkIn: async (reservationId, faceVerified, keyType) => {
+    const res = await fetch('/api/checkin/checkin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reservationId, faceVerified, keyType }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '入住失败')
+    }
+    set((state) => ({
+      reservations: state.reservations.map((r) =>
+        r.id === reservationId ? { ...r, status: 'checked_in' } : r
+      ),
+    }))
+    return data.data
+  },
+
+  checkOut: async (reservationId) => {
+    const res = await fetch('/api/checkin/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reservationId }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '退房失败')
+    }
+    set((state) => ({
+      reservations: state.reservations.map((r) =>
+        r.id === reservationId ? { ...r, status: 'checked_out' } : r
+      ),
+    }))
+    return data.data
   },
 }))
 

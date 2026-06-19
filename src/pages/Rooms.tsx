@@ -17,7 +17,7 @@ const statusFilters: { key: RoomStatus | 'all'; label: string; color: string }[]
 const typeLabels: Record<string, string> = { standard: '标准间', deluxe: '豪华间', suite: '套房', presidential: '总统套房' }
 
 export default function Rooms() {
-  const { rooms, selectedRoom, fetchRooms, selectRoom, updateIoT } = useRoomStore()
+  const { rooms, selectedRoom, fetchRooms, selectRoom, deselectRoom, updateIoT } = useRoomStore()
   const [statusFilter, setStatusFilter] = useState<RoomStatus | 'all'>('all')
   const [floorFilter, setFloorFilter] = useState<number>(0)
 
@@ -44,7 +44,7 @@ export default function Rooms() {
     selectRoom(room.id)
   }
 
-  const handleIoTUpdate = (device: string, settings: any) => {
+  const handleIoTUpdate = (device: 'ac' | 'light' | 'curtain', settings: Record<string, any>) => {
     if (selectedRoom) {
       updateIoT(selectedRoom.id, device, settings)
     }
@@ -123,10 +123,11 @@ export default function Rooms() {
       {selectedRoom && (
         <div className="flex-shrink-0">
           <IoTPanel
-            roomNumber={selectedRoom.number}
-            iot={selectedRoom.iot}
+            key={selectedRoom.id}
+            roomNumber={selectedRoom.roomNumber}
+            iot={selectedRoom.iotDevices}
             onUpdate={handleIoTUpdate}
-            onClose={() => selectRoom(selectedRoom.id)}
+            onClose={deselectRoom}
           />
         </div>
       )}

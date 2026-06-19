@@ -41,18 +41,18 @@ export default function RoomCard({ room, onClick }: RoomCardProps) {
       />
       <div className="p-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-lg font-bold text-[#F5F0EB] font-['Playfair_Display']">{room.number}</span>
-          <span className="text-sm">{typeIcons[room.type]}</span>
+          <span className="text-lg font-bold text-[#F5F0EB] font-['Playfair_Display']">{room.roomNumber}</span>
+          <span className="text-sm">{typeIcons[room.roomType]}</span>
         </div>
         <div className="flex items-center gap-2 mb-2">
           <BedDouble className="w-3.5 h-3.5 text-[#C9A96E]/60" />
-          <span className="text-xs text-[#F5F0EB]/50">{typeLabels[room.type]}</span>
+          <span className="text-xs text-[#F5F0EB]/50">{typeLabels[room.roomType]}</span>
         </div>
         <StatusBadge status={room.status} type="room" />
-        {room.guestName && (
+        {room.currentGuest?.name && (
           <div className="mt-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
             <User className="w-3 h-3 text-[#C9A96E]/60" />
-            <span className="text-xs text-[#C9A96E]">{room.guestName}</span>
+            <span className="text-xs text-[#C9A96E]">{room.currentGuest.name}</span>
           </div>
         )}
       </div>

@@ -30,6 +30,32 @@ function getProgressToNextTier(tier: string, points: number): number {
   return Math.min(100, Math.max(0, Math.round(progress)))
 }
 
+function prefsToTags(prefs: { preference_key: string; preference_value: string }[]): string[] {
+  const tags: string[] = []
+  for (const p of prefs) {
+    if (p.preference_key === 'floor' && p.preference_value === 'high') tags.push('high_floor')
+    else if (p.preference_key === 'floor' && p.preference_value === 'low') tags.push('low_floor')
+    else if (p.preference_key === 'smoking' && p.preference_value === 'non-smoking') tags.push('non_smoking')
+    else if (p.preference_key === 'smoking' && p.preference_value === 'smoking') tags.push('smoking')
+    else if (p.preference_key === 'pillow' && p.preference_value === 'firm') tags.push('firm_pillow')
+    else if (p.preference_key === 'pillow' && p.preference_value === 'soft') tags.push('soft_pillow')
+  }
+  return tags
+}
+
+function tagsToPrefMap(tags: string[]): Record<string, string> {
+  const map: Record<string, string> = {}
+  for (const tag of tags) {
+    if (tag === 'high_floor') map.floor = 'high'
+    else if (tag === 'low_floor') map.floor = 'low'
+    else if (tag === 'non_smoking') map.smoking = 'non-smoking'
+    else if (tag === 'smoking') map.smoking = 'smoking'
+    else if (tag === 'firm_pillow') map.pillow = 'firm'
+    else if (tag === 'soft_pillow') map.pillow = 'soft'
+  }
+  return map
+}
+
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const members = queryAll<{
@@ -57,7 +83,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
         tier: m.tier,
         points: m.points,
         totalSpent: m.total_spent,
-        preferences: prefs.map(p => `${p.preference_key}:${p.preference_value}`),
+        preferences: prefsToTags(prefs),
         stayCount: m.stay_count,
         lastStay: lastStay?.check_out || undefined,
         nextTierThreshold: nextThreshold,
@@ -107,7 +133,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
         points: member.points,
         totalSpent: member.total_spent,
         stayCount: member.stay_count,
-        preferences: prefs.map(p => ({ key: p.preference_key, value: p.preference_value })),
+        preferences: prefsToTags(prefs),
         spendHistory: spendHistory.map(s => ({
           checkIn: s.check_in,
           checkOut: s.check_out,
@@ -141,19 +167,11 @@ router.put('/:id/preferences', async (req: Request, res: Response): Promise<void
 
     run('DELETE FROM member_preferences WHERE member_id = ?', [memberId])
 
-    const prefMap: Record<string, string> = {}
-    for (const pref of preferences) {
-      if (typeof pref === 'string' && pref.includes(':')) {
-        const [key, value] = pref.split(':')
-        prefMap[key.trim()] = value.trim()
-      } else if (typeof pref === 'object' && pref.key && pref.value) {
-        prefMap[pref.key] = pref.value
-      }
-    }
+    const prefMap = tagsToPrefMap(preferences)
 
     for (const [key, value] of Object.entries(prefMap)) {
       run(
-        'INSERT INTO member_preferences (member_id, preference_key, preference_value) VALUES (?, ?, ?)',
+        'INSERT OR IGNORE INTO member_preferences (member_id, preference_key, preference_value) VALUES (?, ?, ?)',
         [memberId, key, value]
       )
     }
@@ -167,7 +185,7 @@ router.put('/:id/preferences', async (req: Request, res: Response): Promise<void
       success: true,
       data: {
         id: memberId,
-        preferences: updatedPrefs.map(p => ({ key: p.preference_key, value: p.preference_value })),
+        preferences: prefsToTags(updatedPrefs),
       },
     })
   } catch (error) {

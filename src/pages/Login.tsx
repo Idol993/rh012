@@ -31,8 +31,8 @@ export default function Login() {
     try {
       await login(employeeId, password, selectedRole)
       navigate('/dashboard')
-    } catch {
-      setError('登录失败，请重试')
+    } catch (err: any) {
+      setError(err.message || '登录失败，请重试')
     } finally {
       setLoading(false)
     }

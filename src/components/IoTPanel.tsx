@@ -5,7 +5,7 @@ import type { IoTState } from '@/store/useRoomStore'
 interface IoTPanelProps {
   roomNumber: string
   iot: IoTState
-  onUpdate: (device: string, settings: Partial<IoTState>) => void
+  onUpdate: (device: 'ac' | 'light' | 'curtain', settings: Record<string, any>) => void
   onClose: () => void
 }
 
@@ -15,7 +15,7 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
   const [acPower, setAcPower] = useState(iot.ac.power)
   const [lightBrightness, setLightBrightness] = useState(iot.light.brightness)
   const [lightPower, setLightPower] = useState(iot.light.power)
-  const [curtainOpen, setCurtainOpen] = useState(iot.curtain)
+  const [curtainOpen, setCurtainOpen] = useState(iot.curtain.open)
 
   const modeLabels: Record<string, string> = { cool: '制冷', heat: '制热', auto: '自动' }
 
@@ -45,7 +45,7 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
               onClick={() => {
                 const newVal = !acPower
                 setAcPower(newVal)
-                onUpdate('ac', { ...iot, ac: { ...iot.ac, power: newVal } })
+                onUpdate('ac', { power: newVal })
               }}
             >
               {toggleSwitch(acPower)}
@@ -62,7 +62,7 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
               max={30}
               value={acTemp}
               onChange={(e) => setAcTemp(Number(e.target.value))}
-              onMouseUp={() => onUpdate('ac', { ...iot, ac: { ...iot.ac, temperature: acTemp } })}
+              onMouseUp={() => onUpdate('ac', { temperature: acTemp })}
               className="w-full h-1.5 bg-[#F5F0EB]/10 rounded-lg appearance-none cursor-pointer accent-[#C9A96E]"
             />
           </div>
@@ -72,7 +72,7 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
                 key={mode}
                 onClick={() => {
                   setAcMode(mode)
-                  onUpdate('ac', { ...iot, ac: { ...iot.ac, mode } })
+                  onUpdate('ac', { mode })
                 }}
                 className={`flex-1 py-1.5 rounded-lg text-xs transition-all ${
                   acMode === mode
@@ -96,7 +96,7 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
               onClick={() => {
                 const newVal = !lightPower
                 setLightPower(newVal)
-                onUpdate('light', { ...iot, light: { ...iot.light, power: newVal } })
+                onUpdate('light', { power: newVal })
               }}
             >
               {toggleSwitch(lightPower)}
@@ -113,7 +113,7 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
               max={100}
               value={lightBrightness}
               onChange={(e) => setLightBrightness(Number(e.target.value))}
-              onMouseUp={() => onUpdate('light', { ...iot, light: { ...iot.light, brightness: lightBrightness } })}
+              onMouseUp={() => onUpdate('light', { brightness: lightBrightness })}
               className="w-full h-1.5 bg-[#F5F0EB]/10 rounded-lg appearance-none cursor-pointer accent-[#C9A96E]"
             />
           </div>
@@ -129,7 +129,7 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
               onClick={() => {
                 const newVal = !curtainOpen
                 setCurtainOpen(newVal)
-                onUpdate('curtain', { ...iot, curtain: newVal })
+                onUpdate('curtain', { open: newVal })
               }}
             >
               {toggleSwitch(curtainOpen)}

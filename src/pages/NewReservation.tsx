@@ -2,8 +2,14 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save } from 'lucide-react'
 import useReservationStore from '@/store/useReservationStore'
+import type { RoomType } from '@/store/useRoomStore'
 
-const roomTypes = ['标准间', '豪华间', '套房', '总统套房']
+const roomTypeOptions: { label: string; value: RoomType }[] = [
+  { label: '标准间', value: 'standard' },
+  { label: '豪华间', value: 'deluxe' },
+  { label: '套房', value: 'suite' },
+  { label: '总统套房', value: 'presidential' },
+]
 const preferenceOptions = ['高楼层', '低楼层', '无烟', '吸烟', '硬枕', '软枕', '朝南', '远离电梯']
 
 export default function NewReservation() {
@@ -11,13 +17,13 @@ export default function NewReservation() {
   const { createReservation, autoAssign } = useReservationStore()
   const [form, setForm] = useState({
     guestName: '',
-    guestPhone: '',
-    roomType: '标准间',
+    phone: '',
+    roomType: 'standard' as RoomType,
     checkIn: '2026-06-19',
     checkOut: '2026-06-22',
     preferences: [] as string[],
   })
-  const [assignResult, setAssignResult] = useState<{ roomId: string; matchScore: number }[] | null>(null)
+  const [assignResult, setAssignResult] = useState<{ roomId: number; roomNumber: string; matchScore: number; matchDetails: { preference: string; matched: boolean }[] } | null>(null)
 
   const togglePref = (pref: string) => {
     setForm((prev) => ({
@@ -31,8 +37,8 @@ export default function NewReservation() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const newRes = await createReservation(form)
-    const results = await autoAssign(newRes.id)
-    setAssignResult(results)
+    const result = await autoAssign(newRes.id)
+    setAssignResult(result)
   }
 
   return (
@@ -61,8 +67,8 @@ export default function NewReservation() {
             <label className="block text-xs text-[#F5F0EB]/50 mb-1.5">联系电话</label>
             <input
               type="tel"
-              value={form.guestPhone}
-              onChange={(e) => setForm({ ...form, guestPhone: e.target.value })}
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
               placeholder="请输入电话"
               className="w-full px-4 py-2.5 bg-[#0D1B2A]/50 border border-[#C9A96E]/20 rounded-lg text-sm text-[#F5F0EB] placeholder-[#F5F0EB]/25"
             />
@@ -72,18 +78,18 @@ export default function NewReservation() {
         <div>
           <label className="block text-xs text-[#F5F0EB]/50 mb-1.5">房型</label>
           <div className="grid grid-cols-4 gap-3">
-            {roomTypes.map((type) => (
+            {roomTypeOptions.map((type) => (
               <button
-                key={type}
+                key={type.value}
                 type="button"
-                onClick={() => setForm({ ...form, roomType: type })}
+                onClick={() => setForm({ ...form, roomType: type.value })}
                 className={`py-2.5 rounded-lg text-sm border transition-all ${
-                  form.roomType === type
+                  form.roomType === type.value
                     ? 'bg-[#C9A96E]/20 text-[#C9A96E] border-[#C9A96E]/40'
                     : 'bg-[#0D1B2A]/50 text-[#F5F0EB]/50 border-[#C9A96E]/10'
                 }`}
               >
-                {type}
+                {type.label}
               </button>
             ))}
           </div>
@@ -144,17 +150,24 @@ export default function NewReservation() {
           <div className="glass-card gold-border-glow p-6 w-[420px]" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-[#C9A96E] mb-4 font-['Playfair_Display']">智能房态分配结果</h3>
             <div className="space-y-3 mb-4">
-              {assignResult.map((r, i) => (
-                <div key={i} className="p-3 bg-[#0D1B2A]/50 rounded-lg border border-[#C9A96E]/10">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-[#F5F0EB]">{r.roomId.replace('room-', '')}号房</span>
-                    <span className="text-sm font-bold text-[#C9A96E]">{r.matchScore}%匹配</span>
-                  </div>
-                  <div className="w-full h-2 bg-[#F5F0EB]/10 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${r.matchScore}%`, backgroundColor: r.matchScore >= 80 ? '#34D399' : '#F59E0B' }} />
-                  </div>
+              <div className="p-3 bg-[#0D1B2A]/50 rounded-lg border border-[#C9A96E]/10">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-[#F5F0EB]">{assignResult.roomNumber}号房</span>
+                  <span className="text-sm font-bold text-[#C9A96E]">{assignResult.matchScore}%匹配</span>
                 </div>
-              ))}
+                <div className="w-full h-2 bg-[#F5F0EB]/10 rounded-full overflow-hidden mb-3">
+                  <div className="h-full rounded-full" style={{ width: `${assignResult.matchScore}%`, backgroundColor: assignResult.matchScore >= 80 ? '#34D399' : '#F59E0B' }} />
+                </div>
+                <div className="space-y-1">
+                  {assignResult.matchDetails.map((detail, i) => (
+                    <div key={i} className="text-xs flex items-center gap-2" style={{ color: detail.matched ? '#34D399' : '#F5F0EB40' }}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${detail.matched ? 'bg-[#34D399]' : 'bg-[#F5F0EB]/20'}`} />
+                      {detail.preference}
+                      {detail.matched ? ' ✓' : ' ✗'}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
             <button onClick={() => { setAssignResult(null); navigate('/reservations') }} className="w-full py-2.5 bg-gradient-to-r from-[#C9A96E] to-[#E8D5B0] text-[#0D1B2A] rounded-lg text-sm font-medium">
               确认并返回

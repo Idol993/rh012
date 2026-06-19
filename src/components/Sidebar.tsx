@@ -3,11 +3,11 @@ import { LayoutDashboard, BedDouble, CalendarCheck, LogIn, Bell, Sparkles, Crown
 import useAuthStore from '@/store/useAuthStore'
 
 const navItems = [
-  { path: '/dashboard', label: '仪表盘', icon: LayoutDashboard, roles: ['staff', 'front_desk', 'housekeeping_supervisor', 'gm'] },
+  { path: '/dashboard', label: '仪表盘', icon: LayoutDashboard, roles: ['front_desk', 'housekeeping_supervisor', 'gm'] },
   { path: '/rooms', label: '客房管理', icon: BedDouble, roles: ['front_desk', 'housekeeping_supervisor', 'gm'] },
   { path: '/reservations', label: '预订管理', icon: CalendarCheck, roles: ['front_desk', 'gm'] },
   { path: '/checkin', label: '自助入住', icon: LogIn, roles: ['front_desk'] },
-  { path: '/services', label: '服务请求', icon: Bell, roles: ['staff', 'front_desk', 'housekeeping_supervisor'] },
+  { path: '/services', label: '服务请求', icon: Bell, roles: ['staff', 'front_desk', 'housekeeping_supervisor', 'gm'] },
   { path: '/housekeeping', label: '客房服务', icon: Sparkles, roles: ['staff', 'housekeeping_supervisor'] },
   { path: '/members', label: '会员管理', icon: Crown, roles: ['front_desk', 'gm'] },
   { path: '/gm-dashboard', label: '总经理看板', icon: Monitor, roles: ['gm'] },

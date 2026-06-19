@@ -6,20 +6,39 @@ export type RoomType = 'standard' | 'deluxe' | 'suite' | 'presidential'
 export interface IoTState {
   ac: { power: boolean; temperature: number; mode: 'cool' | 'heat' | 'auto' }
   light: { power: boolean; brightness: number }
-  curtain: boolean
+  curtain: { open: boolean }
+}
+
+export interface MinibarItem {
+  id: number
+  name: string
+  price: number
+  weight: number
+  currentWeight: number
+  consumed: boolean
+  consumedAt?: string
+}
+
+export interface CurrentGuest {
+  id: number
+  name: string
+  phone: string
+  memberId?: number
 }
 
 export interface Room {
-  id: string
-  number: string
+  id: number
+  roomNumber: string
   floor: number
-  type: RoomType
+  roomType: RoomType
   status: RoomStatus
-  guestName?: string
-  guestId?: string
-  iot: IoTState
-  minibar: { item: string; quantity: number; price: number }[]
-  notes?: string
+  isSmoking: boolean
+  hasFirmPillow: boolean
+  currentGuest?: CurrentGuest | null
+  iotDevices: IoTState
+  minibar: MinibarItem[]
+  lastCleanedAt?: string | null
+  pricePerNight: number
 }
 
 interface RoomState {
@@ -27,41 +46,12 @@ interface RoomState {
   selectedRoom: Room | null
   loading: boolean
   fetchRooms: () => Promise<void>
-  selectRoom: (id: string) => void
-  updateRoomStatus: (id: string, status: RoomStatus) => Promise<void>
-  updateIoT: (id: string, device: string, settings: Partial<IoTState>) => Promise<void>
-  preArrival: (id: string) => Promise<void>
-}
-
-const generateRooms = (): Room[] => {
-  const rooms: Room[] = []
-  const types: RoomType[] = ['standard', 'standard', 'deluxe', 'suite', 'presidential']
-  const statuses: RoomStatus[] = ['available', 'occupied', 'occupied', 'cleaning', 'available', 'reserved', 'maintenance']
-  const guests = ['张伟', '李娜', '王芳', '刘洋', '陈明', '赵雪', '孙鹏', '周丽', '吴强', '郑慧']
-  for (let floor = 1; floor <= 8; floor++) {
-    for (let room = 1; room <= 5; room++) {
-      const num = `${floor}${String(room).padStart(2, '0')}`
-      const statusIdx = (floor * 5 + room) % statuses.length
-      const isOccupied = statuses[statusIdx] === 'occupied'
-      rooms.push({
-        id: `room-${num}`,
-        number: num,
-        floor,
-        type: types[room - 1],
-        status: statuses[statusIdx],
-        guestName: isOccupied ? guests[(floor + room) % guests.length] : undefined,
-        iot: {
-          ac: { power: isOccupied, temperature: 22 + (room % 4), mode: 'cool' },
-          light: { power: isOccupied, brightness: isOccupied ? 60 + (room * 10) : 0 },
-          curtain: isOccupied,
-        },
-        minibar: isOccupied
-          ? [{ item: '矿泉水', quantity: 2, price: 10 }, { item: '可乐', quantity: 1, price: 15 }]
-          : [],
-      })
-    }
-  }
-  return rooms
+  fetchRoom: (id: number) => Promise<Room>
+  selectRoom: (id: number) => void
+  deselectRoom: () => void
+  updateRoomStatus: (id: number, status: RoomStatus) => Promise<void>
+  updateIoT: (id: number, device: 'ac' | 'light' | 'curtain', settings: Record<string, any>) => Promise<void>
+  preArrival: (id: number, acTemperature?: number, lightBrightness?: number) => Promise<void>
 }
 
 const useRoomStore = create<RoomState>((set, get) => ({
@@ -71,14 +61,22 @@ const useRoomStore = create<RoomState>((set, get) => ({
 
   fetchRooms: async () => {
     set({ loading: true })
-    try {
-      const res = await fetch('/api/rooms')
-      if (!res.ok) throw new Error()
-      const data = await res.json()
-      set({ rooms: data, loading: false })
-    } catch {
-      set({ rooms: generateRooms(), loading: false })
+    const res = await fetch('/api/rooms')
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      set({ loading: false })
+      throw new Error(data.error || '获取房间列表失败')
     }
+    set({ rooms: data.data, loading: false })
+  },
+
+  fetchRoom: async (id: number) => {
+    const res = await fetch(`/api/rooms/${id}`)
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '获取房间详情失败')
+    }
+    return data.data
   },
 
   selectRoom: (id) => {
@@ -86,14 +84,20 @@ const useRoomStore = create<RoomState>((set, get) => ({
     set({ selectedRoom: room })
   },
 
+  deselectRoom: () => {
+    set({ selectedRoom: null })
+  },
+
   updateRoomStatus: async (id, status) => {
-    try {
-      await fetch(`/api/rooms/${id}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-    } catch {}
+    const res = await fetch(`/api/rooms/${id}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '更新房间状态失败')
+    }
     set((state) => ({
       rooms: state.rooms.map((r) => (r.id === id ? { ...r, status } : r)),
       selectedRoom: state.selectedRoom?.id === id ? { ...state.selectedRoom, status } : state.selectedRoom,
@@ -101,34 +105,35 @@ const useRoomStore = create<RoomState>((set, get) => ({
   },
 
   updateIoT: async (id, device, settings) => {
-    try {
-      await fetch(`/api/rooms/${id}/iot`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ device, settings }),
-      })
-    } catch {}
+    const res = await fetch(`/api/rooms/${id}/iot`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ device, settings }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '更新IoT设备失败')
+    }
     set((state) => ({
       rooms: state.rooms.map((r) =>
-        r.id === id ? { ...r, iot: { ...r.iot, ...settings } } : r
+        r.id === id ? { ...r, iotDevices: { ...r.iotDevices, [device]: { ...r.iotDevices[device as keyof IoTState], ...settings } } } : r
       ),
       selectedRoom: state.selectedRoom?.id === id
-        ? { ...state.selectedRoom, iot: { ...state.selectedRoom.iot, ...settings } }
+        ? { ...state.selectedRoom, iotDevices: { ...state.selectedRoom.iotDevices, [device]: { ...state.selectedRoom.iotDevices[device as keyof IoTState], ...settings } } }
         : state.selectedRoom,
     }))
   },
 
-  preArrival: async (id) => {
-    try {
-      await fetch(`/api/rooms/${id}/pre-arrival`, { method: 'POST' })
-    } catch {}
-    set((state) => ({
-      rooms: state.rooms.map((r) =>
-        r.id === id
-          ? { ...r, iot: { ...r.iot, ac: { ...r.iot.ac, power: true, temperature: 22, mode: 'cool' as const }, light: { ...r.iot.light, power: true, brightness: 40 }, curtain: false } }
-          : r
-      ),
-    }))
+  preArrival: async (id, acTemperature = 22, lightBrightness = 40) => {
+    const res = await fetch(`/api/rooms/${id}/pre-arrival`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ acTemperature, lightBrightness }),
+    })
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '预入住设置失败')
+    }
   },
 }))
 
