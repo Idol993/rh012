@@ -33,7 +33,7 @@ const priorityColors: Record<string, string> = { low: '#34D399', medium: '#3B82F
 const priorityLabels: Record<string, string> = { low: '低', medium: '中', high: '高' }
 
 export default function Housekeeping() {
-  const { fetchRooms, updateRoomStatus } = useRoomStore()
+  const { fetchRooms } = useRoomStore()
   const { user } = useAuthStore()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(false)
@@ -70,15 +70,16 @@ export default function Housekeeping() {
   const handleStartClean = async (taskId: number) => {
     setStartingTask(taskId)
     try {
-      const res = await fetch(`/api/housekeeping/tasks/${taskId}/start`, {
+      const res = await fetch(`/api/housekeeping/tasks/${taskId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffId: Number(user?.id) }),
+        body: JSON.stringify({ status: 'in_progress', assignedTo: Number(user?.id) }),
       })
       const data = await res.json()
       if (!res.ok || !data.success) {
         throw new Error(data.error || '开始清洁失败')
       }
+      fetchRooms()
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: 'in_progress' } : t))
     } catch (err: any) {
       setError(err.message || '开始清洁失败')
@@ -99,8 +100,8 @@ export default function Housekeeping() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || '清洁完成失败')
       }
-      setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: 'completed', completedAt: new Date().toISOString() } : t))
-      updateRoomStatus(task.roomId, 'available')
+      fetchTasks()
+      fetchRooms()
       setScanSuccess(task.id)
       setTimeout(() => setScanSuccess(null), 1500)
     } catch (err: any) {

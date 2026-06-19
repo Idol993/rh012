@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Wand2, Clock, Droplets, Shirt, Sparkles, Wrench, HelpCircle } from 'lucide-react'
 import useServiceStore from '@/store/useServiceStore'
+import useRoomStore from '@/store/useRoomStore'
 import type { ServiceType, ServiceStatus, Priority } from '@/store/useServiceStore'
 
 const typeIcons: Record<ServiceType, typeof Droplets> = {
@@ -29,29 +30,33 @@ const priorityLabels: Record<Priority, string> = {
 
 const columns: { key: ServiceStatus; label: string }[] = [
   { key: 'pending', label: '待处理' },
+  { key: 'assigned', label: '已派单' },
   { key: 'in_progress', label: '进行中' },
   { key: 'completed', label: '已完成' },
 ]
 
 export default function Services() {
   const { serviceRequests, fetchRequests, createRequest, updateRequestStatus, autoDispatch } = useServiceStore()
+  const { rooms, fetchRooms } = useRoomStore()
   const [showNewModal, setShowNewModal] = useState(false)
   const [dispatchResult, setDispatchResult] = useState<{ id: number; staff: { id: number; name: string; distance: string } } | null>(null)
   const [newForm, setNewForm] = useState({ roomNumber: '', type: 'water' as ServiceType, description: '', priority: 'medium' as Priority })
 
   useEffect(() => {
     fetchRequests()
-  }, [fetchRequests])
+    fetchRooms()
+  }, [fetchRequests, fetchRooms])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    const roomId = Number(newForm.roomNumber)
-    if (isNaN(roomId)) {
-      alert('请输入有效的房间号')
+    const room = rooms.find((r) => r.roomNumber === newForm.roomNumber)
+    if (!room) {
+      alert('未找到该房间号，请确认后重试')
       return
     }
     try {
-      await createRequest({ roomId, type: newForm.type, description: newForm.description, priority: newForm.priority })
+      await createRequest({ roomId: room.id, type: newForm.type, description: newForm.description, priority: newForm.priority })
+      await fetchRequests()
       setShowNewModal(false)
       setNewForm({ roomNumber: '', type: 'water', description: '', priority: 'medium' })
     } catch (err: any) {
@@ -68,9 +73,18 @@ export default function Services() {
     }
   }
 
-  const handleConfirmDispatch = (serviceId: number) => {
-    updateRequestStatus(serviceId, 'assigned')
+  const handleConfirmDispatch = async (serviceId: number) => {
+    await fetchRequests()
     setDispatchResult(null)
+  }
+
+  const handleStatusChange = async (id: number, status: ServiceStatus) => {
+    try {
+      await updateRequestStatus(id, status)
+      await fetchRequests()
+    } catch (err: any) {
+      alert(err.message || '状态更新失败')
+    }
   }
 
   return (
@@ -82,7 +96,7 @@ export default function Services() {
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         {columns.map((col) => {
           const items = serviceRequests.filter((r) => r.status === col.key)
           return (
@@ -117,18 +131,21 @@ export default function Services() {
                           </button>
                         )}
                         {req.status === 'assigned' && (
-                          <button onClick={() => updateRequestStatus(req.id, 'in_progress')} className="text-xs text-[#34D399] hover:text-[#34D399]/80">
+                          <button onClick={() => handleStatusChange(req.id, 'in_progress')} className="text-xs text-[#34D399] hover:text-[#34D399]/80">
                             开始处理
                           </button>
                         )}
                         {req.status === 'in_progress' && (
-                          <button onClick={() => updateRequestStatus(req.id, 'completed')} className="text-xs text-[#34D399] hover:text-[#34D399]/80">
+                          <button onClick={() => handleStatusChange(req.id, 'completed')} className="text-xs text-[#34D399] hover:text-[#34D399]/80">
                             完成
                           </button>
                         )}
                       </div>
                       {req.assignedTo && (
                         <div className="mt-2 text-xs text-[#F5F0EB]/40">处理人：{req.assignedTo.name}</div>
+                      )}
+                      {req.completedAt && (
+                        <div className="mt-1 text-xs text-[#34D399]/60">完成于：{new Date(req.completedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</div>
                       )}
                     </div>
                   )
@@ -144,7 +161,7 @@ export default function Services() {
           <div className="glass-card gold-border-glow p-6 w-[420px]" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-[#C9A96E] mb-4 font-['Playfair_Display']">新建服务请求</h3>
             <form onSubmit={handleCreate} className="space-y-4">
-              <input type="text" placeholder="房间号" value={newForm.roomNumber} onChange={(e) => setNewForm({ ...newForm, roomNumber: e.target.value })} className="w-full px-4 py-2.5 bg-[#0D1B2A]/50 border border-[#C9A96E]/20 rounded-lg text-sm text-[#F5F0EB] placeholder-[#F5F0EB]/25" required />
+              <input type="text" placeholder="房间号（如801）" value={newForm.roomNumber} onChange={(e) => setNewForm({ ...newForm, roomNumber: e.target.value })} className="w-full px-4 py-2.5 bg-[#0D1B2A]/50 border border-[#C9A96E]/20 rounded-lg text-sm text-[#F5F0EB] placeholder-[#F5F0EB]/25" required />
               <select value={newForm.type} onChange={(e) => setNewForm({ ...newForm, type: e.target.value as ServiceType })} className="w-full px-4 py-2.5 bg-[#0D1B2A]/50 border border-[#C9A96E]/20 rounded-lg text-sm text-[#F5F0EB]">
                 {Object.entries(typeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>

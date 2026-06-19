@@ -34,7 +34,8 @@ const useAuthStore = create<AuthState>((set, get) => ({
     if (!res.ok || !data.success) {
       throw new Error(data.error || '登录失败')
     }
-    const { token, user } = data.data
+    const token = data.token
+    const user = data.user
     localStorage.setItem('token', token)
     set({
       user: {
@@ -69,7 +70,11 @@ const useAuthStore = create<AuthState>((set, get) => ({
     const res = await fetch('/api/auth/me', {
       headers: { 'Authorization': `Bearer ${token}` },
     })
-    if (!res.ok) throw new Error('验证失败')
+    if (!res.ok) {
+      localStorage.removeItem('token')
+      set({ user: null, token: null, isAuthenticated: false })
+      throw new Error('验证失败')
+    }
     const data = await res.json()
     set({
       user: {

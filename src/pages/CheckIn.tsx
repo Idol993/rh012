@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { User, CheckCircle, Key, ScanLine } from 'lucide-react'
 import useReservationStore from '@/store/useReservationStore'
+import useRoomStore from '@/store/useRoomStore'
 import StatusBadge from '@/components/StatusBadge'
 
 const steps = ['选择预订', '人脸验证', '发放钥匙', '完成入住']
 
 export default function CheckIn() {
   const { reservations, fetchReservations, checkIn } = useReservationStore()
+  const { fetchRooms } = useRoomStore()
   const [currentStep, setCurrentStep] = useState(0)
   const [selectedRes, setSelectedRes] = useState<number | null>(null)
   const [scanning, setScanning] = useState(false)
@@ -32,7 +34,7 @@ export default function CheckIn() {
     loadReservations()
   }, [fetchReservations])
 
-  const confirmedRes = reservations.filter((r) => r.status === 'confirmed')
+  const confirmedRes = reservations.filter((r) => r.status === 'confirmed' && r.roomId)
 
   const handleSelectRes = (id: number) => {
     setSelectedRes(id)
@@ -54,6 +56,8 @@ export default function CheckIn() {
     try {
       const result = await checkIn(selectedRes, verified, keyType)
       setCheckInResult({ roomNumber: result.roomNumber, keyInfo: result.keyInfo })
+      await fetchReservations()
+      await fetchRooms()
       setCurrentStep(3)
       setTimeout(() => setComplete(true), 500)
     } catch (err: any) {
@@ -118,6 +122,7 @@ export default function CheckIn() {
                   </div>
                   <div className="flex items-center gap-4 mt-2 text-xs text-[#F5F0EB]/50">
                     <span>{r.roomType}</span>
+                    {r.roomNumber && <span>房间：{r.roomNumber}</span>}
                     <span>{r.checkIn} → {r.checkOut}</span>
                   </div>
                 </button>

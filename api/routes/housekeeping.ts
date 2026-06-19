@@ -52,7 +52,7 @@ router.post('/scan-clean', async (req: Request, res: Response): Promise<void> =>
       return
     }
 
-    if (room.status !== 'cleaning') {
+    if (room.status !== 'cleaning' && room.status !== 'occupied') {
       res.status(400).json({ success: false, error: '该房间不需要清洁（当前状态：' + room.status + '）' })
       return
     }
@@ -122,6 +122,13 @@ router.put('/tasks/:id', async (req: Request, res: Response): Promise<void> => {
 
     params.push(taskId)
     run(`UPDATE housekeeping_tasks SET ${parts.join(', ')} WHERE id = ?`, params)
+
+    if (status === 'in_progress') {
+      const task = queryOne<{ room_id: number }>('SELECT room_id FROM housekeeping_tasks WHERE id = ?', [taskId])
+      if (task) {
+        run("UPDATE rooms SET status = 'cleaning' WHERE id = ?", [task.room_id])
+      }
+    }
 
     res.json({ success: true, data: { id: taskId } })
   } catch (error) {

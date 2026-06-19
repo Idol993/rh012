@@ -108,9 +108,25 @@ router.put('/:id/status', async (req: Request, res: Response): Promise<void> => 
 
 router.post('/auto-dispatch', async (req: Request, res: Response): Promise<void> => {
   try {
-    const pendingRequests = queryAll<{ id: number; room_id: number }>(
-      "SELECT id, room_id FROM service_requests WHERE status = 'pending' ORDER BY created_at ASC"
-    )
+    const { requestId } = req.body
+
+    let pendingRequests: { id: number; room_id: number }[]
+
+    if (requestId) {
+      const single = queryOne<{ id: number; room_id: number }>(
+        "SELECT id, room_id FROM service_requests WHERE id = ? AND status = 'pending'",
+        [requestId]
+      )
+      if (!single) {
+        res.status(404).json({ success: false, error: '未找到该待处理请求' })
+        return
+      }
+      pendingRequests = [single]
+    } else {
+      pendingRequests = queryAll<{ id: number; room_id: number }>(
+        "SELECT id, room_id FROM service_requests WHERE status = 'pending' ORDER BY created_at ASC"
+      )
+    }
 
     if (pendingRequests.length === 0) {
       res.json({ success: true, data: { dispatched: [], message: '没有待派工的请求' } })
@@ -173,7 +189,11 @@ router.post('/auto-dispatch', async (req: Request, res: Response): Promise<void>
       })
     }
 
-    res.json({ success: true, data: { dispatched } })
+    if (requestId && dispatched.length === 1) {
+      res.json({ success: true, data: { requestId: dispatched[0].requestId, assignedStaff: dispatched[0].assignedStaff } })
+    } else {
+      res.json({ success: true, data: { dispatched } })
+    }
   } catch (error) {
     res.status(500).json({ success: false, error: '自动派工失败' })
   }

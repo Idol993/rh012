@@ -13,7 +13,9 @@ export interface Reservation {
   roomType: RoomType
   status: ReservationStatus
   preferences: string[]
-  assignedRoomId?: number
+  roomId?: number
+  roomNumber?: string
+  keyType?: string
   totalAmount?: number
   createdAt: string
 }
