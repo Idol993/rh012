@@ -54,12 +54,37 @@ export interface RevenueData {
   total: number
 }
 
+export interface ServiceRequestSummary {
+  pending: number
+  assigned: number
+  in_progress: number
+  completed: number
+}
+
+export interface ServiceMonitorItem {
+  id: number
+  roomNumber: string
+  type: string
+  priority: string
+  status: string
+  description: string
+  assignedTo: { id: number; name: string } | null
+  createdAt: string
+  completedAt: string | null
+}
+
+export interface ServiceMonitorData {
+  summary: ServiceRequestSummary
+  items: ServiceMonitorItem[]
+}
+
 export interface GMDashboardData {
   occupancy: OccupancyData
   revpar: RevPARData
   reviews: ReviewsData
   energy: EnergyData
   revenue: RevenueData
+  serviceRequests: ServiceMonitorData
 }
 
 export interface NightAuditReport {

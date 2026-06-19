@@ -160,10 +160,15 @@ export default function Services() {
                       </div>
                       <p className="text-xs text-[#F5F0EB]/60 mb-2">{typeLabels[req.type]} - {req.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#F5F0EB]/30 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {new Date(req.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-[#F5F0EB]/30 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(req.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {req.status === 'pending' && (
+                            <span className="text-xs text-[#8B9DC3]">未派单</span>
+                          )}
+                        </div>
                         {req.status === 'pending' && !isStaffView && (
                           <button onClick={() => handleAutoDispatch(req.id)} className="text-xs text-[#3B82F6] hover:text-[#3B82F6]/80 flex items-center gap-1">
                             <Wand2 className="w-3 h-3" />智能派单
@@ -180,9 +185,13 @@ export default function Services() {
                           </button>
                         )}
                       </div>
-                      {req.assignedTo && (
-                        <div className="mt-2 text-xs text-[#F5F0EB]/40">处理人：{req.assignedTo.name}</div>
-                      )}
+                      <div className="mt-2 text-xs">
+                        {req.assignedTo ? (
+                          <span className="text-[#F5F0EB]/40">处理人：{req.assignedTo.name}</span>
+                        ) : (
+                          <span className="text-[#8B9DC3]">处理人：未派单</span>
+                        )}
+                      </div>
                       {req.completedAt && (
                         <div className="mt-1 text-xs text-[#34D399]/60">完成于：{new Date(req.completedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</div>
                       )}

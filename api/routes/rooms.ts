@@ -286,4 +286,119 @@ router.post('/:id/pre-arrival', async (req: Request, res: Response): Promise<voi
   }
 })
 
+router.get('/:id/timeline', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const roomId = Number(req.params.id)
+    const room = queryOne<RoomRow>('SELECT * FROM rooms WHERE id = ?', [roomId])
+
+    if (!room) {
+      res.status(404).json({ success: false, error: '房间不存在' })
+      return
+    }
+
+    const serviceTypeLabel: Record<string, string> = {
+      water: '送水',
+      towel: '毛巾',
+      cleaning: '清洁',
+      maintenance: '维修',
+      other: '其他',
+    }
+
+    const housekeepingTypeLabel: Record<string, string> = {
+      checkout_clean: '退房清洁',
+      daily_clean: '日常清洁',
+      deep_clean: '深度清洁',
+    }
+
+    const events: any[] = []
+
+    const minibarItems = queryAll(
+      'SELECT name, price, consumed_at FROM minibar_items WHERE room_id = ? AND consumed = 1',
+      [roomId]
+    )
+    for (const item of minibarItems) {
+      if (item.consumed_at) {
+        events.push({
+          time: item.consumed_at,
+          type: 'minibar',
+          title: `迷你吧消费 - ${item.name}`,
+          detail: `¥${item.price}`,
+          iconHint: '🥤',
+        })
+      }
+    }
+
+    const serviceRequests = queryAll<{ id: number; type: string; description: string; status: string; created_at: string; completed_at: string | null }>(
+      'SELECT id, type, description, status, created_at, completed_at FROM service_requests WHERE room_id = ?',
+      [roomId]
+    )
+    for (const sr of serviceRequests) {
+      events.push({
+        time: sr.created_at,
+        type: 'service',
+        title: `服务请求 - ${serviceTypeLabel[sr.type] || sr.type}`,
+        detail: sr.description,
+        iconHint: '🛎️',
+        status: sr.status,
+        completedAt: sr.completed_at,
+      })
+    }
+
+    const housekeepingTasks = queryAll<{ id: number; type: string; status: string; quality_score: number | null; created_at: string; completed_at: string | null }>(
+      'SELECT id, type, status, quality_score, created_at, completed_at FROM housekeeping_tasks WHERE room_id = ?',
+      [roomId]
+    )
+    for (const hk of housekeepingTasks) {
+      const completedPart = hk.completed_at ? ` - 完成于 ${hk.completed_at.substring(0, 16)}` : ''
+      events.push({
+        time: hk.created_at,
+        type: 'housekeeping',
+        title: `清洁任务 - ${housekeepingTypeLabel[hk.type] || hk.type}`,
+        detail: `${hk.status}${completedPart}`,
+        iconHint: '🧹',
+        quality_score: hk.quality_score,
+      })
+    }
+
+    if (room.last_cleaned_at) {
+      events.push({
+        time: room.last_cleaned_at,
+        type: 'iot',
+        title: '清洁完成',
+        detail: '房间状态已更新为净房',
+        iconHint: '✨',
+      })
+    }
+
+    if (room.status === 'occupied' || room.status === 'reserved') {
+      const reservation = queryOne<{ check_in: string }>(
+        "SELECT check_in FROM reservations WHERE room_id = ? AND status IN ('checked_in', 'reserved') ORDER BY check_in DESC LIMIT 1",
+        [roomId]
+      )
+      if (reservation) {
+        events.push({
+          time: `${reservation.check_in}T14:00:00`,
+          type: 'iot',
+          title: '预入住准备',
+          detail: '空调开启 22°C · 灯光 60%',
+          iconHint: '🔌',
+        })
+      }
+    }
+
+    events.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+
+    res.json({
+      success: true,
+      data: {
+        roomId: room.id,
+        roomNumber: room.room_number,
+        events,
+      },
+    })
+  } catch (error) {
+    res.status(500).json({ success: false, error: '获取房间时间线失败' })
+  }
+})
+
 export default router

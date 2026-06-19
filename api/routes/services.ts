@@ -85,7 +85,7 @@ router.put('/:id/status', async (req: Request, res: Response): Promise<void> => 
       return
     }
 
-    const existing = queryOne<{ id: number }>('SELECT id FROM service_requests WHERE id = ?', [requestId])
+    const existing = queryOne<{ id: number; type: string; room_id: number }>('SELECT id, type, room_id FROM service_requests WHERE id = ?', [requestId])
     if (!existing) {
       res.status(404).json({ success: false, error: '服务请求不存在' })
       return
@@ -100,6 +100,14 @@ router.put('/:id/status', async (req: Request, res: Response): Promise<void> => 
       run('UPDATE service_requests SET status = ? WHERE id = ?', [status, requestId])
     }
 
+    if (existing.type === 'maintenance') {
+      if (status === 'assigned') {
+        run('UPDATE rooms SET status = ? WHERE id = ?', ['maintenance', existing.room_id])
+      } else if (status === 'completed') {
+        run('UPDATE rooms SET status = ? WHERE id = ?', ['occupied', existing.room_id])
+      }
+    }
+
     res.json({ success: true, data: { id: requestId, status } })
   } catch (error) {
     res.status(500).json({ success: false, error: '更新服务请求状态失败' })
@@ -110,11 +118,11 @@ router.post('/auto-dispatch', async (req: Request, res: Response): Promise<void>
   try {
     const { requestId } = req.body
 
-    let pendingRequests: { id: number; room_id: number }[]
+    let pendingRequests: { id: number; room_id: number; type: string }[]
 
     if (requestId) {
-      const single = queryOne<{ id: number; room_id: number }>(
-        "SELECT id, room_id FROM service_requests WHERE id = ? AND status = 'pending'",
+      const single = queryOne<{ id: number; room_id: number; type: string }>(
+        "SELECT id, room_id, type FROM service_requests WHERE id = ? AND status = 'pending'",
         [requestId]
       )
       if (!single) {
@@ -123,8 +131,8 @@ router.post('/auto-dispatch', async (req: Request, res: Response): Promise<void>
       }
       pendingRequests = [single]
     } else {
-      pendingRequests = queryAll<{ id: number; room_id: number }>(
-        "SELECT id, room_id FROM service_requests WHERE status = 'pending' ORDER BY created_at ASC"
+      pendingRequests = queryAll<{ id: number; room_id: number; type: string }>(
+        "SELECT id, room_id, type FROM service_requests WHERE status = 'pending' ORDER BY created_at ASC"
       )
     }
 
@@ -178,6 +186,10 @@ router.post('/auto-dispatch', async (req: Request, res: Response): Promise<void>
         "UPDATE service_requests SET assigned_to = ?, status = 'assigned' WHERE id = ?",
         [bestStaff.id, request.id]
       )
+
+      if (request.type === 'maintenance') {
+        run('UPDATE rooms SET status = ? WHERE id = ?', ['maintenance', request.room_id])
+      }
 
       dispatched.push({
         requestId: request.id,

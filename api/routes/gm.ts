@@ -114,6 +114,34 @@ router.get('/dashboard', async (_req: Request, res: Response): Promise<void> => 
     const occupancyTrend = [68, 72, 75, 70, 78, 82, currentOccupancy]
     const revparTrend = [520, 580, 610, 590, 640, 680, revpar]
 
+    const pendingCount = queryOne<{ count: number }>("SELECT COUNT(*) as count FROM service_requests WHERE status = 'pending'")?.count ?? 0
+    const assignedCount = queryOne<{ count: number }>("SELECT COUNT(*) as count FROM service_requests WHERE status = 'assigned'")?.count ?? 0
+    const inProgressCount = queryOne<{ count: number }>("SELECT COUNT(*) as count FROM service_requests WHERE status = 'in_progress'")?.count ?? 0
+    const completedCount = queryOne<{ count: number }>("SELECT COUNT(*) as count FROM service_requests WHERE status = 'completed'")?.count ?? 0
+
+    const serviceItems = queryAll(
+      `SELECT sr.id, sr.room_id, sr.type, sr.description, sr.priority, sr.status,
+              sr.assigned_to, sr.created_at, sr.completed_at,
+              rm.room_number,
+              e.name as assigned_name
+       FROM service_requests sr
+       LEFT JOIN rooms rm ON sr.room_id = rm.id
+       LEFT JOIN employees e ON sr.assigned_to = e.id
+       ORDER BY sr.created_at DESC`
+    )
+
+    const items = serviceItems.map((r: any) => ({
+      id: r.id,
+      roomNumber: r.room_number,
+      type: r.type,
+      priority: r.priority,
+      status: r.status,
+      description: r.description,
+      assignedTo: r.assigned_to ? { id: r.assigned_to, name: r.assigned_name } : null,
+      createdAt: r.created_at,
+      completedAt: r.completed_at || null,
+    }))
+
     res.json({
       success: true,
       data: {
@@ -166,6 +194,15 @@ router.get('/dashboard', async (_req: Request, res: Response): Promise<void> => 
           minibarRevenue,
           serviceRevenue: Math.max(0, serviceRevenue),
           total: totalRevenue,
+        },
+        serviceRequests: {
+          summary: {
+            pending: pendingCount,
+            assigned: assignedCount,
+            in_progress: inProgressCount,
+            completed: completedCount,
+          },
+          items,
         },
       },
     })

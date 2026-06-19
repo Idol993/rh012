@@ -43,19 +43,38 @@ export interface Room {
   isSmoking: boolean
   hasFirmPillow: boolean
   currentGuest?: CurrentGuest | null
-  reservation?: ReservationContext | null
   iotDevices: IoTState
   minibar: MinibarItem[]
   lastCleanedAt?: string | null
   pricePerNight: number
+  reservation?: ReservationContext | null
+}
+
+export interface TimelineEvent {
+  time: string
+  type: 'minibar' | 'service' | 'housekeeping' | 'iot'
+  title: string
+  detail: string
+  iconHint: string
+  status?: string
+  completedAt?: string | null
+  qualityScore?: number | null
+}
+
+export interface RoomTimeline {
+  roomId: number
+  roomNumber: string
+  events: TimelineEvent[]
 }
 
 interface RoomState {
   rooms: Room[]
   selectedRoom: Room | null
+  selectedTimeline: TimelineEvent[]
   loading: boolean
   fetchRooms: () => Promise<void>
   fetchRoom: (id: number) => Promise<Room>
+  fetchTimeline: (id: number) => Promise<void>
   selectRoom: (id: number) => void
   deselectRoom: () => void
   updateRoomStatus: (id: number, status: RoomStatus) => Promise<void>
@@ -66,6 +85,7 @@ interface RoomState {
 const useRoomStore = create<RoomState>((set, get) => ({
   rooms: [],
   selectedRoom: null,
+  selectedTimeline: [],
   loading: false,
 
   fetchRooms: async () => {
@@ -88,13 +108,25 @@ const useRoomStore = create<RoomState>((set, get) => ({
     return data.data
   },
 
+  fetchTimeline: async (id: number) => {
+    const res = await fetch(`/api/rooms/${id}/timeline`)
+    const data = await res.json()
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || '获取时间线失败')
+    }
+    set({ selectedTimeline: data.data.events || [] })
+  },
+
   selectRoom: (id) => {
     const room = get().rooms.find((r) => r.id === id) || null
     set({ selectedRoom: room })
+    if (room) {
+      get().fetchTimeline(id).catch(() => set({ selectedTimeline: [] }))
+    }
   },
 
   deselectRoom: () => {
-    set({ selectedRoom: null })
+    set({ selectedRoom: null, selectedTimeline: [] })
   },
 
   updateRoomStatus: async (id, status) => {

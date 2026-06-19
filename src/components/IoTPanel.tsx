@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { X, Thermometer, Sun, Blinds, Power, User, MessageCircle } from 'lucide-react'
+import { X, Thermometer, Sun, Blinds, Power, User, MessageCircle, Clock } from 'lucide-react'
 import type { IoTState } from '@/store/useRoomStore'
+import type { TimelineEvent } from '@/store/useRoomStore'
 
 interface GuestInfo {
   id: number
@@ -23,9 +24,10 @@ interface IoTPanelProps {
   guest?: GuestInfo | null
   reservation?: ReservationInfo | null
   onRequestService?: () => void
+  timeline?: TimelineEvent[]
 }
 
-export default function IoTPanel({ roomNumber, iot, onUpdate, onClose, guest, reservation, onRequestService }: IoTPanelProps) {
+export default function IoTPanel({ roomNumber, iot, onUpdate, onClose, guest, reservation, onRequestService, timeline }: IoTPanelProps) {
   const [acTemp, setAcTemp] = useState(iot.ac.temperature)
   const [acMode, setAcMode] = useState(iot.ac.mode)
   const [acPower, setAcPower] = useState(iot.ac.power)
@@ -226,6 +228,38 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose, guest, re
             <span>{curtainOpen ? '已打开' : '已关闭'}</span>
           </div>
         </div>
+
+        {timeline && timeline.length > 0 && (
+          <div className="gradient-border p-4">
+            <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#C9A96E]/10">
+              <Clock className="w-4 h-4 text-[#C9A96E]" />
+              <span className="text-sm font-bold text-[#C9A96E]">消费与服务时间线</span>
+            </div>
+            <div className="relative space-y-3">
+              {timeline.map((evt, idx) => (
+                <div key={idx} className="flex gap-3 relative">
+                  <div className="flex flex-col items-center">
+                    <div className="w-7 h-7 rounded-full bg-[#0D1B2A] border border-[#C9A96E]/30 flex items-center justify-center text-xs flex-shrink-0">
+                      {evt.iconHint || '•'}
+                    </div>
+                    {idx < timeline.length - 1 && (
+                      <div className="w-px flex-1 bg-gradient-to-b from-[#C9A96E]/30 to-transparent mt-0.5" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0 pb-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-[#F5F0EB] truncate">{evt.title}</span>
+                      <span className="text-[10px] text-[#F5F0EB]/35 flex-shrink-0">
+                        {evt.time ? evt.time.substring(5, 16).replace('T', ' ') : ''}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#F5F0EB]/45 mt-0.5 break-words">{evt.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

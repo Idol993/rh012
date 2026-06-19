@@ -2,14 +2,42 @@ import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { TrendingUp, TrendingDown, Zap, Star, Download, RefreshCw } from 'lucide-react'
 import useDashboardStore from '@/store/useDashboardStore'
+import useServiceStore from '@/store/useServiceStore'
+import type { ServiceType, Priority } from '@/store/useServiceStore'
+
+const serviceTypeLabels: Record<ServiceType, string> = {
+  water: '送水',
+  towel: '毛巾',
+  cleaning: '清洁',
+  maintenance: '维修',
+  other: '其他',
+}
+
+const servicePriorityColors: Record<Priority, string> = {
+  low: '#34D399', medium: '#3B82F6', high: '#F59E0B', urgent: '#EF4444',
+}
+
+const servicePriorityLabels: Record<Priority, string> = {
+  low: '低', medium: '中', high: '高', urgent: '紧急',
+}
+
+const statusFilters: { key: 'all' | 'pending' | 'assigned' | 'in_progress' | 'completed'; label: string }[] = [
+  { key: 'all', label: '全部' },
+  { key: 'pending', label: '待处理' },
+  { key: 'assigned', label: '已派单' },
+  { key: 'in_progress', label: '进行中' },
+  { key: 'completed', label: '已完成' },
+]
 
 export default function GMDashboard() {
   const { dashboardData, loading, fetchDashboardData, exportReport } = useDashboardStore()
+  const { fetchRequests } = useServiceStore()
   const [lastRefresh, setLastRefresh] = useState(new Date())
+  const [serviceFilter, setServiceFilter] = useState<'all' | 'pending' | 'assigned' | 'in_progress' | 'completed'>('all')
 
   const handleRefresh = async () => {
     try {
-      await fetchDashboardData()
+      await Promise.all([fetchDashboardData(), fetchRequests()])
       setLastRefresh(new Date())
     } catch (err: any) {
       alert(err.message || '刷新失败')
@@ -289,6 +317,78 @@ export default function GMDashboard() {
               </span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="mt-4 bg-[#1B2A4A]/80 border border-[#C9A96E]/10 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-[#C9A96E]">住中服务监控</h3>
+        </div>
+        <div className="flex items-center gap-2 mb-4">
+          {statusFilters.map((f) => {
+            const count = f.key === 'all'
+              ? data.serviceRequests.summary.pending + data.serviceRequests.summary.assigned + data.serviceRequests.summary.in_progress + data.serviceRequests.summary.completed
+              : data.serviceRequests.summary[f.key]
+            return (
+              <button
+                key={f.key}
+                onClick={() => setServiceFilter(f.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  serviceFilter === f.key
+                    ? 'bg-[#C9A96E]/20 border border-[#C9A96E] text-[#C9A96E]'
+                    : 'bg-[#0D1B2A]/50 border border-[#4a5568]/30 text-[#8B9DC3] hover:border-[#C9A96E]/30'
+                }`}
+              >
+                {f.label} {count}
+              </button>
+            )
+          })}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#2d3748]">
+                <th className="text-left py-2.5 px-3 text-xs font-medium text-[#8B9DC3]">房号</th>
+                <th className="text-left py-2.5 px-3 text-xs font-medium text-[#8B9DC3]">服务类型</th>
+                <th className="text-left py-2.5 px-3 text-xs font-medium text-[#8B9DC3]">负责人</th>
+                <th className="text-left py-2.5 px-3 text-xs font-medium text-[#8B9DC3]">优先级</th>
+                <th className="text-left py-2.5 px-3 text-xs font-medium text-[#8B9DC3]">创建时间</th>
+                <th className="text-left py-2.5 px-3 text-xs font-medium text-[#8B9DC3]">完成时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.serviceRequests.items
+                .filter((item) => serviceFilter === 'all' || item.status === serviceFilter)
+                .map((item) => (
+                  <tr key={item.id} className="border-b border-[#2d3748]/50 hover:bg-[#0D1B2A]/30">
+                    <td className="py-2.5 px-3 text-[#F5F0EB] font-medium">{item.roomNumber}</td>
+                    <td className="py-2.5 px-3 text-[#F5F0EB]">
+                      {serviceTypeLabels[item.type as ServiceType] || item.type}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      {item.assignedTo ? (
+                        <span className="text-[#F5F0EB]">{item.assignedTo.name}</span>
+                      ) : (
+                        <span className="text-[#8B9DC3]">未派单</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className="px-1.5 py-0.5 rounded text-xs"
+                        style={{
+                          color: servicePriorityColors[item.priority as Priority],
+                          backgroundColor: servicePriorityColors[item.priority as Priority] + '20',
+                        }}
+                      >
+                        {servicePriorityLabels[item.priority as Priority]}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-[#8B9DC3]">{item.createdAt.substring(11, 16)}</td>
+                    <td className="py-2.5 px-3 text-[#8B9DC3]">{item.completedAt ? item.completedAt.substring(11, 16) : '-'}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

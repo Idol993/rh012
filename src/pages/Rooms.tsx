@@ -19,7 +19,7 @@ const typeLabels: Record<string, string> = { standard: '标准间', deluxe: '豪
 
 export default function Rooms() {
   const navigate = useNavigate()
-  const { rooms, selectedRoom, fetchRooms, selectRoom, deselectRoom, updateIoT } = useRoomStore()
+  const { rooms, selectedRoom, selectedTimeline, fetchRooms, selectRoom, deselectRoom, updateIoT } = useRoomStore()
   const [statusFilter, setStatusFilter] = useState<RoomStatus | 'all'>('all')
   const [floorFilter, setFloorFilter] = useState<number>(0)
 
@@ -133,6 +133,7 @@ export default function Rooms() {
             guest={selectedRoom.currentGuest}
             reservation={selectedRoom.reservation}
             onRequestService={() => navigate(`/services?roomNumber=${selectedRoom.roomNumber}`)}
+            timeline={selectedTimeline}
           />
         </div>
       )}
