@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Plus, Wand2, Clock, Droplets, Shirt, Sparkles, Wrench, HelpCircle } from 'lucide-react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import useServiceStore from '@/store/useServiceStore'
 import useRoomStore from '@/store/useRoomStore'
+import useAuthStore from '@/store/useAuthStore'
 import type { ServiceType, ServiceStatus, Priority } from '@/store/useServiceStore'
 
 const typeIcons: Record<ServiceType, typeof Droplets> = {
@@ -38,7 +40,11 @@ const columns: { key: ServiceStatus; label: string }[] = [
 export default function Services() {
   const { serviceRequests, fetchRequests, createRequest, updateRequestStatus, autoDispatch } = useServiceStore()
   const { rooms, fetchRooms } = useRoomStore()
+  const { user } = useAuthStore()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [showNewModal, setShowNewModal] = useState(false)
+  const [prefillRoomNumber, setPrefillRoomNumber] = useState<string | null>(null)
   const [dispatchResult, setDispatchResult] = useState<{ id: number; staff: { id: number; name: string; distance: string } } | null>(null)
   const [newForm, setNewForm] = useState({ roomNumber: '', type: 'water' as ServiceType, description: '', priority: 'medium' as Priority })
 
@@ -46,6 +52,23 @@ export default function Services() {
     fetchRequests()
     fetchRooms()
   }, [fetchRequests, fetchRooms])
+
+  useEffect(() => {
+    const roomNumberParam = searchParams.get('roomNumber')
+    if (roomNumberParam) {
+      setPrefillRoomNumber(roomNumberParam)
+      setNewForm((prev) => ({ ...prev, roomNumber: roomNumberParam }))
+      setShowNewModal(true)
+    }
+  }, [searchParams])
+
+  const isStaffView = user?.role === 'staff'
+  const userId = user ? parseInt(user.id, 10) : NaN
+
+  const clearUrlParams = () => {
+    navigate('/services', { replace: true })
+    setPrefillRoomNumber(null)
+  }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,9 +82,16 @@ export default function Services() {
       await fetchRequests()
       setShowNewModal(false)
       setNewForm({ roomNumber: '', type: 'water', description: '', priority: 'medium' })
+      clearUrlParams()
     } catch (err: any) {
       alert(err.message || '创建失败')
     }
+  }
+
+  const handleCloseModal = () => {
+    setShowNewModal(false)
+    setNewForm({ roomNumber: '', type: 'water', description: '', priority: 'medium' })
+    clearUrlParams()
   }
 
   const handleAutoDispatch = async (id: number) => {
@@ -87,18 +117,27 @@ export default function Services() {
     }
   }
 
+  const filteredRequests = isStaffView
+    ? serviceRequests.filter((req) => req.assignedTo?.id === userId)
+    : serviceRequests
+
   return (
     <div className="animate-fade-in">
       <div className="flex items-center gap-3 mb-4">
+        {isStaffView ? (
+          <h2 className="text-lg font-bold text-[#C9A96E]">我的待办 (服务员: {user?.name})</h2>
+        ) : null}
         <div className="flex-1" />
-        <button onClick={() => setShowNewModal(true)} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C9A96E] to-[#E8D5B0] text-[#0D1B2A] rounded-lg text-sm font-medium">
-          <Plus className="w-4 h-4" />新建请求
-        </button>
+        {!isStaffView && (
+          <button onClick={() => setShowNewModal(true)} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C9A96E] to-[#E8D5B0] text-[#0D1B2A] rounded-lg text-sm font-medium">
+            <Plus className="w-4 h-4" />新建请求
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-4 gap-4">
         {columns.map((col) => {
-          const items = serviceRequests.filter((r) => r.status === col.key)
+          const items = filteredRequests.filter((r) => r.status === col.key)
           return (
             <div key={col.key} className="gradient-border p-4 min-h-[60vh]">
               <div className="flex items-center justify-between mb-4">
@@ -125,7 +164,7 @@ export default function Services() {
                           <Clock className="w-3 h-3" />
                           {new Date(req.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        {req.status === 'pending' && (
+                        {req.status === 'pending' && !isStaffView && (
                           <button onClick={() => handleAutoDispatch(req.id)} className="text-xs text-[#3B82F6] hover:text-[#3B82F6]/80 flex items-center gap-1">
                             <Wand2 className="w-3 h-3" />智能派单
                           </button>
@@ -157,7 +196,7 @@ export default function Services() {
       </div>
 
       {showNewModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={() => setShowNewModal(false)}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center" onClick={handleCloseModal}>
           <div className="glass-card gold-border-glow p-6 w-[420px]" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-[#C9A96E] mb-4 font-['Playfair_Display']">新建服务请求</h3>
             <form onSubmit={handleCreate} className="space-y-4">

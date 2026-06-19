@@ -75,6 +75,9 @@ export default function Reservations() {
               <th className="text-left py-3 px-4 text-xs text-[#C9A96E] font-medium">入住</th>
               <th className="text-left py-3 px-4 text-xs text-[#C9A96E] font-medium">退房</th>
               <th className="text-left py-3 px-4 text-xs text-[#C9A96E] font-medium">房型</th>
+              <th className="text-left py-3 px-4 text-xs text-[#C9A96E] font-medium">房间</th>
+              <th className="text-left py-3 px-4 text-xs text-[#C9A96E] font-medium">钥匙</th>
+              <th className="text-left py-3 px-4 text-xs text-[#C9A96E] font-medium">办理</th>
               <th className="text-left py-3 px-4 text-xs text-[#C9A96E] font-medium">状态</th>
               <th className="text-left py-3 px-4 text-xs text-[#C9A96E] font-medium">操作</th>
             </tr>
@@ -87,6 +90,9 @@ export default function Reservations() {
                 <td className="py-3 px-4 text-sm text-[#F5F0EB]/70">{res.checkIn}</td>
                 <td className="py-3 px-4 text-sm text-[#F5F0EB]/70">{res.checkOut}</td>
                 <td className="py-3 px-4 text-sm text-[#F5F0EB]/70">{res.roomType}</td>
+                <td className="py-3 px-4 text-sm text-[#F5F0EB]/70">{res.roomNumber || '未排房'}</td>
+                <td className="py-3 px-4 text-sm text-[#F5F0EB]/70">{res.keyType === 'card' ? '房卡' : res.keyType === 'bluetooth' ? '蓝牙' : '-'}</td>
+                <td className="py-3 px-4 text-sm text-[#F5F0EB]/70">{res.status === 'checked_in' && res.updatedAt ? res.updatedAt.substring(0, 16).replace('T', ' ') : '-'}</td>
                 <td className="py-3 px-4"><StatusBadge status={res.status} type="reservation" /></td>
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-2">
@@ -150,7 +156,10 @@ export default function Reservations() {
               )}
             </div>
             <button
-              onClick={() => setAssignModal(null)}
+              onClick={async () => {
+                setAssignModal(null)
+                await fetchReservations()
+              }}
               className="w-full mt-4 py-2.5 bg-gradient-to-r from-[#C9A96E] to-[#E8D5B0] text-[#0D1B2A] rounded-lg text-sm font-medium"
             >
               确认分配

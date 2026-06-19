@@ -1,15 +1,31 @@
 import { useState } from 'react'
-import { X, Thermometer, Sun, Blinds, Power } from 'lucide-react'
+import { X, Thermometer, Sun, Blinds, Power, User, MessageCircle } from 'lucide-react'
 import type { IoTState } from '@/store/useRoomStore'
 
+interface GuestInfo {
+  id: number
+  name: string
+  phone: string
+  memberId?: number
+}
+interface ReservationInfo {
+  reservationId: number
+  checkIn: string
+  checkOut: string
+  keyType?: string
+  memberTier?: string
+}
 interface IoTPanelProps {
   roomNumber: string
   iot: IoTState
   onUpdate: (device: 'ac' | 'light' | 'curtain', settings: Record<string, any>) => void
   onClose: () => void
+  guest?: GuestInfo | null
+  reservation?: ReservationInfo | null
+  onRequestService?: () => void
 }
 
-export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPanelProps) {
+export default function IoTPanel({ roomNumber, iot, onUpdate, onClose, guest, reservation, onRequestService }: IoTPanelProps) {
   const [acTemp, setAcTemp] = useState(iot.ac.temperature)
   const [acMode, setAcMode] = useState(iot.ac.mode)
   const [acPower, setAcPower] = useState(iot.ac.power)
@@ -25,6 +41,23 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
     </div>
   )
 
+  const maskPhone = (phone: string) => {
+    if (phone.length < 7) return phone
+    return phone.slice(0, 3) + '****' + phone.slice(-4)
+  }
+
+  const memberTierMap: Record<string, { label: string; color: string }> = {
+    diamond: { label: '💎钻石', color: '#C9A96E' },
+    platinum: { label: '👑白金', color: '#E5E7EB' },
+    gold: { label: '🥇金卡', color: '#F59E0B' },
+    silver: { label: '🥈银卡', color: '#9CA3AF' },
+  }
+
+  const keyTypeMap: Record<string, string> = {
+    card: '房卡',
+    bluetooth: '蓝牙钥匙',
+  }
+
   return (
     <div className="animate-slide-in-right w-80 bg-[#0D1B2A] border-l border-[#C9A96E]/20 h-full overflow-y-auto">
       <div className="p-4 border-b border-[#C9A96E]/20 flex items-center justify-between">
@@ -35,6 +68,59 @@ export default function IoTPanel({ roomNumber, iot, onUpdate, onClose }: IoTPane
       </div>
 
       <div className="p-4 space-y-6">
+        {guest && (
+          <div className="gradient-border p-4 space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-[#C9A96E]/10">
+              <User className="w-4 h-4 text-[#C9A96E]" />
+              <span className="text-sm font-bold text-[#C9A96E]">客人信息</span>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#F5F0EB]/50">客人姓名</span>
+                <span className="text-[#F5F0EB] font-medium">{guest.name}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#F5F0EB]/50">电话</span>
+                <span className="text-[#F5F0EB] font-medium">{maskPhone(guest.phone)}</span>
+              </div>
+
+              {reservation && (
+                <>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#F5F0EB]/50">入住日期</span>
+                    <span className="text-[#F5F0EB] font-medium">{reservation.checkIn} → {reservation.checkOut}</span>
+                  </div>
+                  {reservation.memberTier && memberTierMap[reservation.memberTier] && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[#F5F0EB]/50">会员等级</span>
+                      <span style={{ color: memberTierMap[reservation.memberTier].color }} className="font-medium">
+                        {memberTierMap[reservation.memberTier].label}
+                      </span>
+                    </div>
+                  )}
+                  {reservation.keyType && keyTypeMap[reservation.keyType] && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[#F5F0EB]/50">钥匙类型</span>
+                      <span className="text-[#F5F0EB] font-medium">{keyTypeMap[reservation.keyType]}</span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {onRequestService && (
+              <button
+                onClick={onRequestService}
+                className="w-full mt-2 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-[#C9A96E] to-[#E8D5B0] text-[#0D1B2A] rounded-lg text-xs font-medium transition-all hover:opacity-90"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                发起服务请求
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="gradient-border p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

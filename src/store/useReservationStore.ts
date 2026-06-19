@@ -18,6 +18,7 @@ export interface Reservation {
   keyType?: string
   totalAmount?: number
   createdAt: string
+  updatedAt?: string
 }
 
 export interface AutoAssignResult {

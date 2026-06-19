@@ -28,7 +28,23 @@ interface GuestRow {
   guest_member_id: number | null
 }
 
-function formatRoom(room: RoomRow, guest?: GuestRow) {
+interface ReservationContext {
+  reservationId: number
+  checkIn: string
+  checkOut: string
+  keyType?: string
+  memberTier?: string
+}
+
+interface ReservationContextRow {
+  reservation_id: number
+  check_in: string
+  check_out: string
+  key_type: string | null
+  member_tier: string | null
+}
+
+function formatRoom(room: RoomRow, guest?: GuestRow, reservationContext?: ReservationContext) {
   return {
     id: room.id,
     roomNumber: room.room_number,
@@ -50,6 +66,7 @@ function formatRoom(room: RoomRow, guest?: GuestRow) {
     },
     lastCleanedAt: room.last_cleaned_at || undefined,
     pricePerNight: room.price_per_night,
+    reservation: reservationContext || null,
   }
 }
 
@@ -58,6 +75,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
     const rooms = queryAll<RoomRow>('SELECT * FROM rooms ORDER BY floor, room_number')
     const result = rooms.map(room => {
       let guest: GuestRow | undefined
+      let reservationContext: ReservationContext | undefined
       if (room.status === 'occupied') {
         guest = queryOne<GuestRow>(
           `SELECT g.id as guest_id, g.name as guest_name, g.phone as guest_phone, g.member_id as guest_member_id
@@ -65,8 +83,24 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
            WHERE r.room_id = ? AND r.status = 'checked_in'`,
           [room.id]
         ) || undefined
+        const reservationRow = queryOne<ReservationContextRow>(
+          `SELECT r.id as reservation_id, r.check_in, r.check_out, r.key_type, m.tier as member_tier
+           FROM reservations r
+           LEFT JOIN members m ON r.member_id = m.id
+           WHERE r.room_id = ? AND r.status = 'checked_in'`,
+          [room.id]
+        )
+        if (reservationRow) {
+          reservationContext = {
+            reservationId: reservationRow.reservation_id,
+            checkIn: reservationRow.check_in,
+            checkOut: reservationRow.check_out,
+            keyType: reservationRow.key_type || undefined,
+            memberTier: reservationRow.member_tier || undefined,
+          }
+        }
       }
-      return formatRoom(room, guest)
+      return formatRoom(room, guest, reservationContext)
     })
     res.json({ success: true, data: result })
   } catch (error) {
@@ -85,6 +119,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     }
 
     let guest: GuestRow | undefined
+    let reservationContext: ReservationContext | undefined
     if (room.status === 'occupied') {
       guest = queryOne<GuestRow>(
         `SELECT g.id as guest_id, g.name as guest_name, g.phone as guest_phone, g.member_id as guest_member_id
@@ -92,6 +127,22 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
          WHERE r.room_id = ? AND r.status = 'checked_in'`,
         [roomId]
       ) || undefined
+      const reservationRow = queryOne<ReservationContextRow>(
+        `SELECT r.id as reservation_id, r.check_in, r.check_out, r.key_type, m.tier as member_tier
+         FROM reservations r
+         LEFT JOIN members m ON r.member_id = m.id
+         WHERE r.room_id = ? AND r.status = 'checked_in'`,
+        [roomId]
+      )
+      if (reservationRow) {
+        reservationContext = {
+          reservationId: reservationRow.reservation_id,
+          checkIn: reservationRow.check_in,
+          checkOut: reservationRow.check_out,
+          keyType: reservationRow.key_type || undefined,
+          memberTier: reservationRow.member_tier || undefined,
+        }
+      }
     }
 
     const minibarItems = queryAll(
@@ -99,7 +150,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       [roomId]
     )
 
-    const formatted = formatRoom(room, guest)
+    const formatted = formatRoom(room, guest, reservationContext)
     res.json({
       success: true,
       data: {

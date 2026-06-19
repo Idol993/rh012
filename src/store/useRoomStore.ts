@@ -26,6 +26,14 @@ export interface CurrentGuest {
   memberId?: number
 }
 
+export interface ReservationContext {
+  reservationId: number
+  checkIn: string
+  checkOut: string
+  keyType?: string
+  memberTier?: string
+}
+
 export interface Room {
   id: number
   roomNumber: string
@@ -35,6 +43,7 @@ export interface Room {
   isSmoking: boolean
   hasFirmPillow: boolean
   currentGuest?: CurrentGuest | null
+  reservation?: ReservationContext | null
   iotDevices: IoTState
   minibar: MinibarItem[]
   lastCleanedAt?: string | null

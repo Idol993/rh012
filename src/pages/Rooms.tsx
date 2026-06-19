@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Filter } from 'lucide-react'
 import useRoomStore from '@/store/useRoomStore'
 import type { Room, RoomStatus } from '@/store/useRoomStore'
@@ -17,6 +18,7 @@ const statusFilters: { key: RoomStatus | 'all'; label: string; color: string }[]
 const typeLabels: Record<string, string> = { standard: '标准间', deluxe: '豪华间', suite: '套房', presidential: '总统套房' }
 
 export default function Rooms() {
+  const navigate = useNavigate()
   const { rooms, selectedRoom, fetchRooms, selectRoom, deselectRoom, updateIoT } = useRoomStore()
   const [statusFilter, setStatusFilter] = useState<RoomStatus | 'all'>('all')
   const [floorFilter, setFloorFilter] = useState<number>(0)
@@ -128,6 +130,9 @@ export default function Rooms() {
             iot={selectedRoom.iotDevices}
             onUpdate={handleIoTUpdate}
             onClose={deselectRoom}
+            guest={selectedRoom.currentGuest}
+            reservation={selectedRoom.reservation}
+            onRequestService={() => navigate(`/services?roomNumber=${selectedRoom.roomNumber}`)}
           />
         </div>
       )}

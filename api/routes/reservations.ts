@@ -7,7 +7,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const reservations = queryAll(
       `SELECT r.id, r.guest_id, r.member_id, r.room_id, r.status, r.check_in, r.check_out,
-              r.room_type, r.preferences, r.total_amount, r.key_type, r.created_at,
+              r.room_type, r.preferences, r.total_amount, r.key_type, r.created_at, r.updated_at,
               g.name as guest_name, g.phone as guest_phone,
               m.name as member_name, m.tier as member_tier,
               rm.room_number
@@ -35,6 +35,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
       totalAmount: r.total_amount,
       keyType: r.key_type,
       createdAt: r.created_at,
+      updatedAt: r.updated_at,
     }))
     res.json({ success: true, data })
   } catch (error) {
@@ -214,7 +215,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
     const reservationId = Number(req.params.id)
     const reservation = queryOne(
       `SELECT r.id, r.guest_id, r.member_id, r.room_id, r.status, r.check_in, r.check_out,
-              r.room_type, r.preferences, r.total_amount, r.key_type, r.created_at,
+              r.room_type, r.preferences, r.total_amount, r.key_type, r.created_at, r.updated_at,
               g.name as guest_name, g.phone as guest_phone,
               m.name as member_name, m.tier as member_tier,
               rm.room_number
@@ -250,6 +251,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
       totalAmount: r.total_amount,
       keyType: r.key_type,
       createdAt: r.created_at,
+      updatedAt: r.updated_at,
     }
 
     res.json({ success: true, data })
@@ -289,7 +291,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 
     const updated = queryOne(
       `SELECT r.id, r.guest_id, r.member_id, r.room_id, r.status, r.check_in, r.check_out,
-              r.room_type, r.preferences, r.total_amount, r.key_type, r.created_at,
+              r.room_type, r.preferences, r.total_amount, r.key_type, r.created_at, r.updated_at,
               g.name as guest_name, g.phone as guest_phone,
               m.name as member_name, m.tier as member_tier,
               rm.room_number
@@ -320,6 +322,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       totalAmount: r.total_amount,
       keyType: r.key_type,
       createdAt: r.created_at,
+      updatedAt: r.updated_at,
     }
 
     res.json({ success: true, data })
